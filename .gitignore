@@ -1,0 +1,65 @@
+# dependencies
+**/node_modules
+**/.pnp
+.pnp.js
+.vite
+
+# testing
+**/coverage
+
+# output
+**/out/
+**/.cache
+**/build
+**/dist
+**/generated/**
+!**/generated/.gitkeep
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env
+.env*.*
+.dev.vars
+!.env.example
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Editor cache directory
+.vs/
+.idea/
+
+# Godot 4+
+**/.godot/
+
+# Cloudflare
+**/functions/\[\[path\]\].js
+**/functions/\[\[path\]\].js.map
+**/functions/metafile.*
+**/version.txt
+**/public/build
+**/.dev.vars
+**/.wrangler/
+wrangler.toml
+wrangler.prod.toml
+**/env.d.ts
+
+# moon
+.moon/cache
+.moon/docker
+
+# rust
+debug/
+target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
