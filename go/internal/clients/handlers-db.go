@@ -11,27 +11,28 @@ import (
 	"go.uber.org/zap"
 )
 
+type Pool interface {
+	db.DBTX
+
+	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+}
+
 type Store struct {
 	*db.Queries
-	db   *pgxpool.Pool
+	db   Pool
 	inTx bool
 }
 
 func New(ctx context.Context, cfg *Config, logger *zap.Logger) (*Clients, error) {
-	dbConn, err := setUpDB(ctx, cfg.DB, logger)
+	database, err := setUpDB(ctx, cfg.DB, logger)
 	if err != nil {
 		return nil, err
 	}
 
 	logger.Info("postgres database connection successful")
 
-	var dbClient *Store = nil
-	if dbConn != nil {
-		dbClient = newStore(dbConn)
-	}
-
 	appClients := &Clients{
-		DB: dbClient,
+		DB: newStore(database),
 	}
 
 	return appClients, nil
@@ -74,7 +75,7 @@ func (s *Store) ExecTx(ctx context.Context, fn func(*Store) error) error {
 	return tx.Commit(ctx)
 }
 
-func newStore(database *pgxpool.Pool) *Store {
+func newStore(database Pool) *Store {
 	return &Store{
 		Queries: db.New(database),
 		db:      database,
@@ -82,11 +83,7 @@ func newStore(database *pgxpool.Pool) *Store {
 }
 
 func setUpDB(ctx context.Context, cfg *DB, logger *zap.Logger) (*pgxpool.Pool, error) {
-	if cfg == nil {
-		return nil, nil
-	}
-
-	if cfg.Driver == nil || cfg.DSN == nil {
+	if cfg == nil || cfg.Driver == nil || cfg.DSN == nil {
 		return nil, errors.New("database connection is required")
 	}
 
