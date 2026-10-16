@@ -8,3 +8,4 @@ catalog:
     "@types/react-dom": ^19.2.7
     typescript: ~6.0.2
     vitest: ^5.0.4
+    "@vitest/coverage-v8": ^5.0.4

@@ -1,0 +1,60 @@
+$schema: "https://moonrepo.dev/schemas/v2/tasks.json"
+
+inheritedBy:
+    stack: "frontend"
+
+fileGroups:
+    configs:
+        - "*.config.{js,cjs,mjs,ts}"
+        - "tsconfig*.json"
+        - "package.json"
+    sources:
+        - "src/**/*"
+    tests:
+        - "**/*.{test,spec}.{ts,tsx}"
+    generated:
+        - "**/*.{gen,generated}.{ts,tsx}"
+
+tasks:
+    typecheck:
+        command: "pnpm run typecheck"
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+            - "@group(tests)"
+
+    test:
+        command: "pnpm run test"
+        deps:
+            - "^:test"
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+            - "@group(tests)"
+        outputs:
+            - "coverage"
+
+    generate:
+        command: "pnpm run generate"
+        preset: "utility"
+
+    lint:
+        command: "pnpm run lint"
+        preset: "utility"
+
+    lint-check:
+        command: "pnpm run lint-check"
+
+    format:
+        command: "pnpm run format"
+        preset: "utility"
+
+    format-check:
+        command: "pnpm run format-check"
+
+    biome:
+        command: "pnpm run biome"
+        preset: "utility"
+
+    biome-check:
+        command: "pnpm run biome-check"

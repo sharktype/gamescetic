@@ -5,11 +5,15 @@
 		"dev": "vite",
 		"build": "tsc -b && vite build",
 		"preview": "vite preview",
-		"test": "vitest run",
-		"test:coverage": "vitest run --coverage",
+		"generate": "echo no generators configured yet",
+		"typecheck": "tsc -b",
+		"test": "vitest run --coverage --passWithNoTests",
 		"lint": "biome lint --write",
+		"lint-check": "biome lint",
 		"format": "biome format --write",
-		"biome": "biome check --write"
+		"format-check": "biome format",
+		"biome": "biome check --write",
+		"biome-check": "biome check"
 	},
 	"dependencies": {
 		"react": "catalog:",
@@ -24,8 +28,10 @@
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
 		"@vitejs/plugin-react": "^6.1.2",
+		"@vitest/coverage-v8": "catalog:",
 		"babel-plugin-react-compiler": "^1.0.0",
 		"typescript": "catalog:",
-		"vite": "^8.3.4"
+		"vite": "^8.3.4",
+		"vitest": "catalog:"
 	}
 }

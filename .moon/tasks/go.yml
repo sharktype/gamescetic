@@ -1,0 +1,63 @@
+$schema: "https://moonrepo.dev/schemas/v2/tasks.json"
+
+inheritedBy:
+    language: "go"
+
+fileGroups:
+    configs:
+        - "go.mod"
+        - "go.sum"
+    sources:
+        - "**/*.go"
+    tests:
+        - "**/*_test.go"
+    generated:
+        - "**/*.pb.go"
+        - "**/*_gen.go"
+        - "**/*.gen.go"
+        - "**/zz_generated*.go" # for k8s
+
+tasks:
+    build:
+        command: "go build -o bin/ ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+        outputs:
+            - "bin/"
+
+    dev:
+        command: "go run ./..."
+
+    generate:
+        command: "go generate ./..."
+        preset: "utility"
+
+    lint:
+        command: "go fix ./..."
+        preset: "utility"
+
+    lint-check:
+        command: "go vet ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+            - "@group(tests)"
+
+    format:
+        command: "go fmt ./..."
+        preset: "utility"
+
+    format-check:
+        script: 'test -z "$(gofmt -l .)"'
+
+    test:
+        command: "go test ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+            - "@group(tests)"
+
+    go:
+        command: "go"
+        preset: "utility"

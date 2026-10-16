@@ -2,10 +2,23 @@
 	"name": "@satchel/example",
 	"private": true,
 	"type": "module",
+	"scripts": {
+		"build": "tsc -b",
+		"generate": "echo no generators configured yet",
+		"typecheck": "tsc -b",
+		"test": "vitest run --coverage --passWithNoTests",
+		"lint": "biome lint --write",
+		"lint-check": "biome lint",
+		"format": "biome format --write",
+		"format-check": "biome format",
+		"biome": "biome check --write",
+		"biome-check": "biome check"
+	},
 	"exports": {
 		".": "./src/index.ts"
 	},
 	"devDependencies": {
+		"@vitest/coverage-v8": "catalog:",
 		"typescript": "catalog:",
 		"vitest": "catalog:"
 	}
