@@ -37,12 +37,14 @@ the list.
 
 - Wishlist management.
 - Hosted version supported with advertisements.
+- REST/GraphQL API.
 
 ### Non-Features
 
 - Any social features.
 - A "profile" of any kind.
-- AI-powered features. If users really want to have
+- AI-powered features. If users really want to have this, they'd need to implement it through the
+  API.
 
 ## Categories
 
