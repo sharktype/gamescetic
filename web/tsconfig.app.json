@@ -1,9 +1,9 @@
 {
-  "extends": "./tsconfig.ui.json",
-  "compilerOptions": {
-    "types": ["vite/client"],
-    "allowArbitraryExtensions": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
-  },
-  "include": ["src"]
+	"extends": "./tsconfig.ui.json",
+	"compilerOptions": {
+		"types": ["vite/client"],
+		"allowArbitraryExtensions": true,
+		"tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+	},
+	"include": ["src"]
 }
