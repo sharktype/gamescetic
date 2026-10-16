@@ -1,0 +1,40 @@
+$schema: "https://moonrepo.dev/schemas/v2/project.json"
+
+language: "go"
+layer: "application"
+stack: "backend"
+
+fileGroups:
+    configs:
+        - "go.mod"
+        - "go.sum"
+    sources:
+        - "**/*.go"
+
+tasks:
+    build:
+        command: "go build -o bin/ ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+        outputs:
+            - "bin/"
+
+    dev:
+        command: "go run ./..."
+
+    lint:
+        command: "go vet ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+
+    test:
+        command: "go test ./..."
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+
+    go:
+        command: "go"
+        preset: "utility"
