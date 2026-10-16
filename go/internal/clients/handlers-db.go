@@ -1,0 +1,103 @@
+package clients
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sharktype/satchel/db"
+	"go.uber.org/zap"
+)
+
+type Store struct {
+	*db.Queries
+	db   *pgxpool.Pool
+	inTx bool
+}
+
+func New(ctx context.Context, cfg *Config, logger *zap.Logger) (*Clients, error) {
+	dbConn, err := setUpDB(ctx, cfg.DB, logger)
+	if err != nil {
+		return nil, err
+	}
+
+	logger.Info("postgres database connection successful")
+
+	var dbClient *Store = nil
+	if dbConn != nil {
+		dbClient = newStore(dbConn)
+	}
+
+	appClients := &Clients{
+		DB: dbClient,
+	}
+
+	return appClients, nil
+}
+
+func (s *Store) IsTx() bool {
+	return s.inTx
+}
+
+// ExecTx runs fn within a transaction.
+//
+// If the Store is already transactional, the callback runs directly without nesting.
+func (s *Store) ExecTx(ctx context.Context, fn func(*Store) error) error {
+	if s.inTx {
+		return fn(s)
+	}
+
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+
+	if err != nil {
+		return err
+	}
+
+	defer tx.Rollback(ctx)
+
+	txStore := &Store{
+		Queries: s.Queries.WithTx(tx),
+		db:      s.db,
+		inTx:    true,
+	}
+
+	if err := fn(txStore); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
+func newStore(database *pgxpool.Pool) *Store {
+	return &Store{
+		Queries: db.New(database),
+		db:      database,
+	}
+}
+
+func setUpDB(ctx context.Context, cfg *DB, logger *zap.Logger) (*pgxpool.Pool, error) {
+	if cfg == nil {
+		return nil, nil
+	}
+
+	if cfg.Driver == nil || cfg.DSN == nil {
+		return nil, fmt.Errorf("database connection is required: GOOSE_DRIVER and GOOSE_DBSTRING must be set")
+	}
+
+	if *cfg.Driver != "postgres" {
+		return nil, fmt.Errorf("unsupported database driver: %s", *cfg.Driver)
+	}
+
+	logger.Debug("connecting to postgres database and testing connection...")
+	pool, err := pgxpool.New(ctx, *cfg.DSN)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := pool.Ping(ctx); err != nil {
+		return nil, err
+	}
+
+	return pool, nil
+}
