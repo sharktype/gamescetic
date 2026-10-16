@@ -54,10 +54,14 @@ func (s *Store) ExecTx(ctx context.Context, fn func(*Store) error) error {
 		return err
 	}
 
-	defer tx.Rollback(ctx)
+	defer func() {
+		// Safe to ignore; actual failures kill the connection.
+
+		_ = tx.Rollback(ctx)
+	}()
 
 	txStore := &Store{
-		Queries: s.Queries.WithTx(tx),
+		Queries: s.WithTx(tx),
 		db:      s.db,
 		inTx:    true,
 	}
