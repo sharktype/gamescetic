@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -86,7 +87,7 @@ func setUpDB(ctx context.Context, cfg *DB, logger *zap.Logger) (*pgxpool.Pool, e
 	}
 
 	if cfg.Driver == nil || cfg.DSN == nil {
-		return nil, fmt.Errorf("database connection is required: GOOSE_DRIVER and GOOSE_DBSTRING must be set")
+		return nil, errors.New("database connection is required")
 	}
 
 	if *cfg.Driver != "postgres" {

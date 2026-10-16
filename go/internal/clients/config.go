@@ -1,7 +1,7 @@
 package clients
 
 type Config struct {
-	DB *DB `envPrefix:"DB_"`
+	DB *DB `envPrefix:"DB_" env:",init"`
 }
 
 type DB struct {
