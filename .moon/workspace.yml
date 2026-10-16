@@ -1,9 +1,12 @@
 projects:
     globFormat: "source-path"
     globs:
-        - "go/app"
-        - "web/app"
+        - "go"
+        - "web"
         - "web/libs/*"
+
+constraints:
+    enforceLayerRelationships: true
 
 vcs:
     defaultBranch: "main"
