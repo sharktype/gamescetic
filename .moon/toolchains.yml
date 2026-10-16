@@ -1,0 +1,6 @@
+javascript:
+    packageManager: "pnpm"
+
+node: {}
+
+pnpm: {}

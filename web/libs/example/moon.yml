@@ -1,0 +1,6 @@
+language: "typescript"
+layer: "library"
+stack: "frontend"
+
+project:
+    description: "temp project"

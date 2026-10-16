@@ -1,0 +1,43 @@
+$schema: "https://moonrepo.dev/schemas/v2/project.json"
+
+language: "typescript"
+layer: "application"
+stack: "frontend"
+
+fileGroups:
+    configs:
+        - "*.config.{js,cjs,mjs,ts}"
+        - "tsconfig*.json"
+        - "package.json"
+    sources:
+        - "src/**/*"
+    tests:
+        - "tests/**/*"
+
+tasks:
+    build:
+        command: "vite build"
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+        outputs:
+            - "dist"
+
+    dev:
+        command: "vite dev"
+
+    preview:
+        command: "vite preview"
+        deps:
+            - "build"
+        preset: "server"
+
+    typecheck:
+        command: "tsc -b"
+        inputs:
+            - "@group(configs)"
+            - "@group(sources)"
+
+    pnpm:
+        command: "pnpm"
+        preset: "utility"
