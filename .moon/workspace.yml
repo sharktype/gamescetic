@@ -1,0 +1,10 @@
+projects:
+    globFormat: "source-path"
+    globs:
+        - "go/app"
+        - "web/app"
+        - "web/libs/*"
+
+vcs:
+    defaultBranch: "main"
+    provider: "github"
