@@ -9,6 +9,19 @@ import (
 	"context"
 )
 
+const getMeta = `-- name: GetMeta :one
+SELECT value
+FROM "meta"
+WHERE key = $1
+`
+
+func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
+	row := q.db.QueryRow(ctx, getMeta, key)
+	var value string
+	err := row.Scan(&value)
+	return value, err
+}
+
 const placeholder = `-- name: Placeholder :one
 SELECT 'OK'
 `
@@ -18,4 +31,21 @@ func (q *Queries) Placeholder(ctx context.Context) (string, error) {
 	var column_1 string
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const setMeta = `-- name: SetMeta :exec
+INSERT INTO "meta" (key, value)
+VALUES ($1, $2)
+ON CONFLICT (key)
+    DO UPDATE SET value = EXCLUDED.value
+`
+
+type SetMetaParams struct {
+	Key   string
+	Value string
+}
+
+func (q *Queries) SetMeta(ctx context.Context, arg SetMetaParams) error {
+	_, err := q.db.Exec(ctx, setMeta, arg.Key, arg.Value)
+	return err
 }

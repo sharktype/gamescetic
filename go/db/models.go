@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type Meta struct {
+	Key   string
+	Value string
+}
+
 type User struct {
 	ID        string
 	Sub       string
