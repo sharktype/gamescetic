@@ -35,7 +35,7 @@ func main() {
 	appClients := clients.MustNew(ctx, &cfg.Clients, logger)
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		router := routing.New(cfg.CORS)
+		router := routing.MustNewRouter(cfg.CORS)
 
 		routing.MustHandle(
 			ctx,
