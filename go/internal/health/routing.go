@@ -2,9 +2,10 @@ package health
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/clients"
+	"go.uber.org/zap"
 )
 
 type GetHealthInput struct{}
@@ -29,15 +30,20 @@ func GetAuthHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, erro
 	return resp, nil
 }
 
-func GetDatabaseHealth(clients *clients.Clients) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
+func GetDatabaseHealth(
+	clients *clients.Clients, logger *zap.Logger,
+) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}
 		_, err := clients.DB.Placeholder(ctx)
 		if err != nil {
+			logger.Error("database health check failed")
+
 			resp.Body.Message = "database connection failed"
 
-			return resp, err
+			return resp, huma.Error503ServiceUnavailable("database unavailable")
 		}
+
 		resp.Body.Message = "database connection OK"
 
 		return resp, nil
@@ -48,5 +54,5 @@ func GetErrorHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, err
 	resp := &GetHealthOutput{}
 	resp.Body.Message = "error health check"
 
-	return resp, fmt.Errorf("intentional error for health check")
+	return resp, huma.Error500InternalServerError("intentional error for health check")
 }
