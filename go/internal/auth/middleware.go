@@ -164,7 +164,7 @@ func bearerToken(header string) (string, bool) {
 	}
 
 	token := strings.TrimSpace(header[len(prefix):])
-	if token == "" || strings.ContainsAny(token, " \t") {
+	if token == "" {
 		return "", false
 	}
 

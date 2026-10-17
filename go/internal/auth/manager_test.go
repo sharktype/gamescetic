@@ -21,8 +21,10 @@ func TestRequireUser(t *testing.T) {
 		expectedErr error
 	}{
 		{
-			name:       "provisioned user",
-			row:        []any{"user-1", "sub-1", "Ada", "ada@lovelace.com", nil, time.Now(), nil},
+			name: "provisioned user",
+			row: []any{
+				"user-1", "sub-1", "Ada", "ada-lovelace@example.com", nil, time.Now(), nil,
+			},
 			expectedID: "user-1",
 		},
 		{
@@ -61,8 +63,8 @@ func TestRequireUser(t *testing.T) {
 				t.Fatalf("got user %q, want %q", user.ID, test.expectedID)
 			}
 
-			if user.Email != "ada@example.com" {
-				t.Fatalf("got email %q, want %q", user.Email, "ada@example.com")
+			if user.Email != "ada-lovelace@example.com" {
+				t.Fatalf("got email %q, want %q", user.Email, "ada-lovelace@example.com")
 			}
 		})
 	}
