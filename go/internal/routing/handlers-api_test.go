@@ -123,6 +123,34 @@ func TestMustNewAPI(t *testing.T) {
 			t.Fatalf("got %q, want %q", body.Message, "user-1 OK")
 		}
 	})
+
+	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
+		idp := newTestIDP(t)
+
+		client := db.NewStub()
+		client.Row = []any{
+			"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com", nil, time.Now(), nil,
+		}
+
+		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+
+		huma.Register(api, huma.Operation{
+			OperationID: "GetErrorHealth",
+			Method:      http.MethodGet,
+			Path:        "/health/error",
+			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
+		}, health.GetErrorHealth)
+
+		request := httptest.NewRequest(http.MethodGet, "/health/error", nil)
+		request.Header.Set("Authorization", "Bearer "+idp.token(t, "sub-1"))
+
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+
+		if response.Code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
+		}
+	})
 }
 
 func TestMustNewRouter(t *testing.T) {
