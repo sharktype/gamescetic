@@ -1,6 +1,10 @@
 package http
 
-import "testing"
+import (
+	nethttp "net/http"
+	"net/http/httptest"
+	"testing"
+)
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
@@ -45,5 +49,27 @@ func TestValidate(t *testing.T) {
 				t.Fatalf("got error %v, want error %t", err, test.expectedErr)
 			}
 		})
+	}
+}
+
+func TestSecurityHeaders(t *testing.T) {
+	handler := SecurityHeaders()(nethttp.HandlerFunc(func(writer nethttp.ResponseWriter, _ *nethttp.Request) {
+		writer.WriteHeader(nethttp.StatusNoContent)
+	}))
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(nethttp.MethodGet, "/", nil))
+
+	expected := map[string]string{
+		"Content-Security-Policy": "default-src 'none'",
+		"Referrer-Policy":         "no-referrer",
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "DENY",
+	}
+
+	for header, value := range expected {
+		if got := response.Header().Get(header); got != value {
+			t.Fatalf("%s: got %q, want %q", header, got, value)
+		}
 	}
 }

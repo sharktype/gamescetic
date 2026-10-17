@@ -49,6 +49,7 @@ func MustNewRouter(
 	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
 	// attacker-controlled to bypass rate limits or other IP restrictions.
 
+	router.Use(http.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
