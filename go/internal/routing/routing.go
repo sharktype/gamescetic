@@ -16,7 +16,20 @@ import (
 	"go.uber.org/zap"
 )
 
-func Handle(
+func MustHandle(
+	ctx context.Context,
+	r *chi.Mux,
+	humaCfg huma.Config,
+	cfg *config.Config,
+	appClients *clients.Clients,
+	logger *zap.Logger,
+) {
+	if err := handle(ctx, r, humaCfg, cfg, appClients, logger); err != nil {
+		panic(fmt.Sprintf("error setting up routing: %v", err))
+	}
+}
+
+func handle(
 	ctx context.Context,
 	r *chi.Mux,
 	humaCfg huma.Config,
@@ -47,7 +60,7 @@ func Handle(
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, 1*time.Minute))
 
-		api := NewAPI(r, humaCfg, &cfg.Auth, jwtCache)
+		api := MustNewAPI(r, humaCfg, &cfg.Auth, jwtCache)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetHealth",
@@ -66,7 +79,7 @@ func Handle(
 			r.Use(auth.EnsureUserMiddleware(clients, logger))
 		}
 
-		api := NewAPI(r, humaCfg, &cfg.Auth, jwtCache)
+		api := MustNewAPI(r, humaCfg, &cfg.Auth, jwtCache)
 
 		if clients.DB != nil {
 			huma.Register(api, huma.Operation{

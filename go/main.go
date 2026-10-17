@@ -30,28 +30,14 @@ type Options struct {
 func main() {
 	ctx := context.Background()
 
-	logger, err := logger.New()
-	if err != nil {
-		panic(fmt.Sprintf("cannot start server; error creating logger: %v", err))
-	}
-
-	cfg, err := config.New(logger)
-	if err != nil {
-		panic(fmt.Sprintf("cannot start server; error loading config: %v", err))
-	}
-
-	appClients, err := clients.New(ctx, &cfg.Clients, logger)
-	if err != nil {
-		panic(fmt.Sprintf("cannot start server; error creating clients: %v", err))
-	}
+	logger := logger.MustNew()
+	cfg := config.MustNew(logger)
+	appClients := clients.MustNew(ctx, &cfg.Clients, logger)
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		router, err := routing.NewRouter(cfg.CORS)
-		if err != nil {
-			panic(fmt.Sprintf("error setting up routing: %v", err))
-		}
+		router := routing.New(cfg.CORS)
 
-		err = routing.Handle(
+		routing.MustHandle(
 			ctx,
 			router,
 			huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
@@ -59,9 +45,6 @@ func main() {
 			appClients,
 			logger,
 		)
-		if err != nil {
-			panic(fmt.Sprintf("error setting up routing: %v", err))
-		}
 
 		server := &http.Server{
 			Addr:              fmt.Sprintf(":%d", options.Port),

@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -12,7 +13,7 @@ import (
 	"github.com/sharktype/satchel/internal/cors"
 )
 
-func NewAPI(
+func MustNewAPI(
 	r chi.Router, humaConfig huma.Config, jwtConfig *auth.Config, jwtCache *jwk.Cache,
 ) huma.API {
 	api := humachi.New(r, humaConfig)
@@ -22,7 +23,21 @@ func NewAPI(
 	return api
 }
 
-func NewRouter(config cors.Config) *chi.Mux {
+func MustNewRouter(config cors.Config) *chi.Mux {
+	router, err := newRouter(config)
+	if err != nil {
+		panic(fmt.Sprintf("error setting up routing: %v", err))
+	}
+
+	return router
+}
+
+func newRouter(config cors.Config) (*chi.Mux, error) {
+	corsHandler, err := cors.New(config)
+	if err != nil {
+		return nil, err
+	}
+
 	router := chi.NewMux()
 
 	// Careful: we don't throttle; be careful and set up infra-level throttling/rate limiting.
@@ -37,7 +52,7 @@ func NewRouter(config cors.Config) *chi.Mux {
 	router.Use(middleware.Timeout(60 * time.Second))
 	router.Use(middleware.Compress(5))
 	router.Use(middleware.Heartbeat("/ping"))
-	router.Use(cors.New(config))
+	router.Use(corsHandler)
 
-	return router
+	return router, nil
 }

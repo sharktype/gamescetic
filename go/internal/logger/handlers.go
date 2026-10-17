@@ -1,12 +1,22 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 
 	"go.uber.org/zap"
 )
 
-func New() (*zap.Logger, error) {
+func MustNew() *zap.Logger {
+	logger, err := newLogger()
+	if err != nil {
+		panic(fmt.Sprintf("error creating logger: %v", err))
+	}
+
+	return logger
+}
+
+func newLogger() (*zap.Logger, error) {
 	level := zap.InfoLevel
 	if verbose := os.Getenv("VERBOSE"); verbose != "" {
 		level = zap.DebugLevel

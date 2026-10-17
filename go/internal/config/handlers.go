@@ -9,7 +9,16 @@ import (
 	"go.uber.org/zap"
 )
 
-func New(logger *zap.Logger) (*Config, error) {
+func MustNew(logger *zap.Logger) *Config {
+	cfg, err := newConfig(logger)
+	if err != nil {
+		panic(fmt.Sprintf("error loading config: %v", err))
+	}
+
+	return cfg
+}
+
+func newConfig(logger *zap.Logger) (*Config, error) {
 	if os.Getenv("PRODUCTION") == "" {
 		logger.Info("app booting in development mode...")
 
