@@ -53,7 +53,7 @@ func GetDatabaseHealth(
 		resp := &GetHealthOutput{}
 		_, err := clients.DB.Placeholder(ctx)
 		if err != nil {
-			logger.Error("database health check failed")
+			logger.Error("database health check failed", zap.Error(err))
 
 			resp.Body.Message = "database connection failed"
 
