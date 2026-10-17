@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -112,7 +113,7 @@ func (i *testIDP) tokenWithScopes(t *testing.T, sub string, scopes []string) str
 	}
 
 	if scopes != nil {
-		if err := token.Set("scopes", scopes); err != nil {
+		if err := token.Set("scope", strings.Join(scopes, " ")); err != nil {
 			t.Fatal(err)
 		}
 	}

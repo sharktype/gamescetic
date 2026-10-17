@@ -166,27 +166,12 @@ func hasAllScopes(token jwt.Token, wanted []string) bool {
 }
 
 func grantedScopes(token jwt.Token) []string {
-	var claim any
-	if err := token.Get("scopes", &claim); err != nil {
+	var scope string
+	if err := token.Get("scope", &scope); err != nil {
 		return nil
 	}
 
-	switch scopes := claim.(type) {
-	case []string:
-		return scopes
-	case []any:
-		granted := make([]string, 0, len(scopes))
-
-		for _, entry := range scopes {
-			if scope, ok := entry.(string); ok {
-				granted = append(granted, scope)
-			}
-		}
-
-		return granted
-	}
-
-	return nil
+	return strings.Fields(scope)
 }
 
 func bearerToken(header string) (string, bool) {
