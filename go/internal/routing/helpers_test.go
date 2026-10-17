@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -9,22 +8,12 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/auth"
+	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
 	"github.com/sharktype/satchel/internal/clients"
 	test_db "github.com/sharktype/satchel/internal/db/test-db"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
-
-const probePath = "/probe"
-
-type stubInput struct{}
-
-type stubOutput struct {
-	Body struct {
-		Message string `json:"message"`
-	}
-}
 
 // "provisioned" means stubbed rather than using the real test database.
 
@@ -41,20 +30,22 @@ func provisionedClients() *clients.Clients {
 	return &clients.Clients{DB: &test_db.Stub{User: provisionedUser()}}
 }
 
-func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Router, huma.API) {
+func newTestAPI(
+	t *testing.T, idp *test_auth.IDP, appClients *clients.Clients,
+) (chi.Router, *huma.Group, *huma.Group) {
 	t.Helper()
 
 	router := chi.NewMux()
 	public, secured := NewAPI(
 		router,
 		huma.DefaultConfig("test", "0.0.0"),
-		idp.cache,
-		idp.config(),
+		idp.Cache,
+		idp.Config(),
 		appClients,
 		zap.NewNop(),
 	)
 
-	return router, api
+	return router, public, secured
 }
 
 func testRouter(t *testing.T) *chi.Mux {
@@ -70,7 +61,7 @@ func testRouter(t *testing.T) *chi.Mux {
 	return NewRouter(corsHandler)
 }
 
-func newHandledRouter(t *testing.T, idp *testIDP) http.Handler {
+func newHandledRouter(t *testing.T, idp *test_auth.IDP) http.Handler {
 	t.Helper()
 
 	router := testRouter(t)
@@ -87,35 +78,6 @@ func newHandledRouter(t *testing.T, idp *testIDP) http.Handler {
 	}
 
 	return router
-}
-
-type probe struct {
-	ran     bool
-	subject string
-	viewer  generated.User
-}
-
-func registerProbe(api huma.API, security []map[string][]string) *probe {
-	recorded := &probe{}
-
-	huma.Register(api, huma.Operation{
-		OperationID: "Probe",
-		Method:      http.MethodGet,
-		Path:        probePath,
-		Security:    security,
-	}, func(ctx context.Context, _ *stubInput) (*stubOutput, error) {
-		recorded.ran = true
-		recorded.subject, _ = auth.SubjectFromContext(ctx)
-		recorded.viewer, _ = auth.ViewerFromContext(ctx)
-
-		return &stubOutput{}, nil
-	})
-
-	return recorded
-}
-
-func requireJWT(scopes ...string) []map[string][]string {
-	return []map[string][]string{{auth.DefaultJWTSchemeKey: scopes}}
 }
 
 func get(router http.Handler, path, authorization string) *httptest.ResponseRecorder {

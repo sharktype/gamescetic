@@ -44,17 +44,17 @@ func SecurityHeaders() Middleware {
 
 func validate(origins []string) error {
 	if len(origins) == 0 {
-		return errors.New("CORS_ALLOWED_ORIGINS is required; list at least one origin")
+		return errors.New("AllowedOrigins is required; list at least one origin")
 	}
 
 	for _, origin := range origins {
 		trimmed := strings.TrimSpace(origin)
 		if trimmed == "" {
-			return errors.New("CORS_ALLOWED_ORIGINS contains an empty origin")
+			return errors.New("AllowedOrigins contains an empty origin")
 		}
 
 		if trimmed == "*" {
-			return errors.New(`CORS_ALLOWED_ORIGINS must list explicit origins, not "*"`)
+			return errors.New(`AllowedOrigins must list explicit origins, not "*"`)
 		}
 	}
 

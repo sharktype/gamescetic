@@ -1,4 +1,4 @@
-package routing
+package test_auth
 
 import (
 	"crypto/ecdsa"
@@ -17,16 +17,16 @@ import (
 	"github.com/sharktype/satchel/internal/auth"
 )
 
-type testIDP struct {
+type IDP struct {
 	JWKSURL  string
 	Issuer   string
 	Audience string
+	Cache    *jwk.Cache
 
-	cache      *jwk.Cache
 	signingKey jwk.Key
 }
 
-func newTestIDP(t *testing.T) *testIDP {
+func NewIDP(t *testing.T) *IDP {
 	t.Helper()
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -70,16 +70,16 @@ func newTestIDP(t *testing.T) *testIDP {
 		t.Fatal(err)
 	}
 
-	return &testIDP{
+	return &IDP{
 		JWKSURL:    server.URL,
 		Issuer:     "issuer",
 		Audience:   "audience",
-		cache:      cache,
+		Cache:      cache,
 		signingKey: signingKey,
 	}
 }
 
-func (i *testIDP) config() auth.Config {
+func (i *IDP) Config() auth.Config {
 	return auth.Config{
 		JWKSURL:  i.JWKSURL,
 		Issuer:   i.Issuer,
@@ -87,13 +87,13 @@ func (i *testIDP) config() auth.Config {
 	}
 }
 
-func (i *testIDP) token(t *testing.T, sub string) string {
+func (i *IDP) Token(t *testing.T, sub string) string {
 	t.Helper()
 
-	return i.tokenWithScopes(t, sub, nil)
+	return i.TokenWithScopes(t, sub, nil)
 }
 
-func (i *testIDP) tokenWithScopes(t *testing.T, sub string, scopes []string) string {
+func (i *IDP) TokenWithScopes(t *testing.T, sub string, scopes []string) string {
 	t.Helper()
 
 	token := jwt.New()

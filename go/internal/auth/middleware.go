@@ -9,25 +9,18 @@ import (
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/jackc/pgx/v5"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/sharktype/satchel/generated"
+	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
 )
 
 type contextKey int
 
-const (
-	subjectKey contextKey = iota
-	userKey
-)
-
-func SubjectFromContext(ctx context.Context) (string, bool) {
-	s, ok := ctx.Value(subjectKey).(string)
-
-	return s, ok && s != ""
-}
+const userKey contextKey = iota
 
 func ViewerFromContext(ctx context.Context) (generated.User, bool) {
 	user, ok := ctx.Value(userKey).(generated.User)
@@ -35,23 +28,32 @@ func ViewerFromContext(ctx context.Context) (generated.User, bool) {
 	return user, ok
 }
 
-// RequireUserMiddleware requires an authenticated user is in context.
-//
-// It must be registered after NewJWTAuthMiddleware, and does not test authorization; just that
-// the user exists at all; i.e. is not anonymous.
-func RequireUserMiddleware(
-	api huma.API, manager *Manager, logger *zap.Logger,
+func NewJWTAuthMiddleware(
+	api huma.API, cache *jwk.Cache, cfg Config, users db.Client, logger *zap.Logger,
 ) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		sub, ok := SubjectFromContext(ctx.Context())
-		if !ok {
+		neededScopes, required := jwtScopes(ctx.Operation())
+		if !required {
 			next(ctx)
 
 			return
 		}
 
-		user, err := manager.RequireUser(ctx.Context(), sub)
-		if errors.Is(err, ErrUserNotProvisioned) {
+		token, sub, ok := verifiedToken(ctx, cache, cfg)
+		if !ok {
+			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+
+			return
+		}
+
+		if !hasAllScopes(token, neededScopes) {
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
+
+			return
+		}
+
+		user, err := users.GetUserBySub(ctx.Context(), sub)
+		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Warn("verified subject is not provisioned", zap.String("sub", sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
@@ -59,7 +61,9 @@ func RequireUserMiddleware(
 		}
 
 		if err != nil {
-			logger.Error("error resolving user in middleware", zap.Error(err))
+			logger.Error(
+				"error resolving user in middleware", zap.String("sub", sub), zap.Error(err),
+			)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -69,59 +73,33 @@ func RequireUserMiddleware(
 	}
 }
 
-func NewJWTAuthMiddleware(
-	api huma.API, cache *jwk.Cache, cfg Config,
-) func(ctx huma.Context, next func(huma.Context)) {
-	return func(ctx huma.Context, next func(huma.Context)) {
-		required := false
-
-		var neededScopes []string
-		for _, requirement := range ctx.Operation().Security {
-			if scopes, ok := requirement[DefaultJWTSchemeKey]; ok {
-				required = true
-				neededScopes = scopes
-
-				break
-			}
+func jwtScopes(operation *huma.Operation) ([]string, bool) {
+	for _, requirement := range operation.Security {
+		if scopes, ok := requirement[DefaultJWTSchemeKey]; ok {
+			return scopes, true
 		}
-
-		if !required {
-			next(ctx)
-
-			return
-		}
-
-		token, ok := bearerToken(ctx.Header("Authorization"))
-		if !ok {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		parsed, err := parseToken(ctx.Context(), cache, cfg, token)
-		if err != nil {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		sub, ok := parsed.Subject()
-		if !ok || sub == "" {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		ctx = huma.WithValue(ctx, subjectKey, sub)
-
-		if !hasAllScopes(parsed, neededScopes) {
-			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
-
-			return
-		}
-
-		next(ctx)
 	}
+
+	return nil, false
+}
+
+func verifiedToken(ctx huma.Context, cache *jwk.Cache, cfg Config) (jwt.Token, string, bool) {
+	raw, ok := bearerToken(ctx.Header("Authorization"))
+	if !ok {
+		return nil, "", false
+	}
+
+	token, err := parseToken(ctx.Context(), cache, cfg, raw)
+	if err != nil {
+		return nil, "", false
+	}
+
+	sub, ok := token.Subject()
+	if !ok || sub == "" {
+		return nil, "", false
+	}
+
+	return token, sub, true
 }
 
 // MustSingleJWTRequirement prevents multiple JWT-naming security requirements.
