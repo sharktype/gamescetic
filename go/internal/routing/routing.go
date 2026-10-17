@@ -71,9 +71,7 @@ func handle(
 
 	// Reminder: default body size limit is 1 MiB.
 
-	// Fallback rate limit (100 /s).
-
-	// Group 1 (rate limit 50 /s).
+	// Group 1 (rate limit 50 /s). Also, remember global rate limiting is 100 /s (middleware).
 
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.Limit(
