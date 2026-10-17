@@ -22,7 +22,7 @@ COPY --from=builder /app/main .
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 COPY sql/migrations/ ./sql/migrations/
 
-EXPOSE 8888
+EXPOSE 9500
 
 RUN adduser -D gouser
 USER gouser

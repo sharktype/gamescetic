@@ -6,6 +6,7 @@ type Config struct {
 	CORS    CORS    `envPrefix:"CORS_"`
 	API     API     `envPrefix:"API_"`
 
+	Port    int  `env:"PORT" envDefault:"9500"`
 	Verbose bool `env:"VERBOSE" envDefault:"false"`
 
 	// Production is resolved from the real environment before .env is loaded, so it is not
