@@ -10,7 +10,7 @@ type Config struct {
 	Verbose bool `env:"VERBOSE" envDefault:"false"`
 
 	// Production is resolved from the real environment before .env is loaded, so it is not
-	// env-tagged; see newConfig.
+	// env-tagged; see New.
 
 	Production bool `env:"-"`
 }

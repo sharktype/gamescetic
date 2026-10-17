@@ -8,19 +8,13 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
-	"github.com/sharktype/satchel/internal/utils"
 )
 
-func MustNew() *Config {
-	cfg, err := newConfig()
-
-	utils.Must(err, "error loading config")
-
-	return cfg
-}
-
-func newConfig() (*Config, error) {
-	production := utils.MustIsProduction()
+func New() (*Config, error) {
+	production, err := isProduction()
+	if err != nil {
+		return nil, err
+	}
 
 	if !production {
 		if err := loadDotEnv(); err != nil {
@@ -36,6 +30,19 @@ func newConfig() (*Config, error) {
 	cfg.Production = production
 
 	return cfg, nil
+}
+
+func isProduction() (bool, error) {
+	production, isSet := os.LookupEnv("PRODUCTION")
+	if !isSet {
+		return false, nil
+	}
+
+	if production != "1" {
+		return false, fmt.Errorf(`PRODUCTION must be unset or "1", got %q`, production)
+	}
+
+	return true, nil
 }
 
 // loadDotEnv loads envars anchored on go.mod's location.

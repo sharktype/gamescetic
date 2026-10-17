@@ -1,7 +1,7 @@
 package routing
 
 import (
-	"net/http"
+	"fmt"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -26,23 +26,36 @@ const (
 	rateLimitWindow  = time.Minute
 )
 
-func MustNewAPI(
+// NewAPI returns the groups every operation must be registered on.
+//
+// Rate limiting must run before the JWT check such that requests with an invalid token still
+// count towards the limit. Huma runs anything attached to the API before anything attached to a
+// group, so the rate limiter and the JWT check are both attached to each group, in that order.
+func NewAPI(
 	r chi.Router,
 	humaConfig huma.Config,
 	jwtCache *jwk.Cache,
 	authConfig auth.Config,
 	clients *clients.Clients,
 	logger *zap.Logger,
-) huma.API {
+) (public *huma.Group, secured *huma.Group) {
 	api := humachi.New(r, humaConfig)
 
-	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtCache, authConfig))
-	api.UseMiddleware(auth.RequireUserMiddleware(api, auth.NewManager(clients.DB), logger))
+	public = huma.NewGroup(api)
+	public.UseSimpleModifier(mustNotDeclareJWT)
+	public.UseMiddleware(rateLimit(publicRateLimit))
 
-	return api
+	secured = huma.NewGroup(api)
+	secured.UseSimpleModifier(declareJWT)
+	secured.UseMiddleware(
+		rateLimit(securedRateLimit),
+		auth.NewJWTAuthMiddleware(api, jwtCache, authConfig, clients.DB, logger),
+	)
+
+	return public, secured
 }
 
-func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
+func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router := chi.NewMux()
 
 	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
@@ -71,24 +84,55 @@ func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	return router
 }
 
-func limitByRoute(
-	limiters map[string]func(http.Handler) http.Handler,
-) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		wrapped := make(map[string]http.Handler, len(limiters))
-		for pattern, limiter := range limiters {
-			wrapped[pattern] = limiter(next)
+func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
+	limiter := httprate.NewRateLimiter(limit, rateLimitWindow)
+
+	return func(ctx huma.Context, next func(huma.Context)) {
+		request, writer := humachi.Unwrap(ctx)
+
+		ip, _ := httprate.KeyByIP(request)
+		if limiter.RespondOnLimit(writer, request, ip+" "+ctx.Operation().OperationID) {
+			return
 		}
 
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			handler, ok := wrapped[chi.RouteContext(request.Context()).RoutePattern()]
-			if !ok {
-				next.ServeHTTP(writer, request)
-
-				return
-			}
-
-			handler.ServeHTTP(writer, request)
-		})
+		next(ctx)
 	}
+}
+
+// declareJWT marks every operation on the secured group as requiring a JWT token.
+//
+// If the operation already declares a JWT requirement, e.g. to ask for scopes, it is left as is.
+// This also matters because Huma calls declareJWT twice per operation: once when adding it to
+// the OpenAPI spec, so the spec shows that a JWT is needed, and once when connecting it to the
+// router.
+//
+// If you're confused, Huma uses each operation for two things: describing it in the OpenAPI spec,
+// and routing requests to it. Anything a group changes about an operation, such as a "/v1" path
+// prefix or this JWT requirement, must apply to both, or the spec would not match how the server
+// behaves. Huma cannot tell which changes matter to which, so it runs declareJWT for both.
+func declareJWT(operation *huma.Operation) {
+	if !declaresJWT(operation) {
+		operation.Security = append(
+			operation.Security, map[string][]string{auth.DefaultJWTSchemeKey: {}},
+		)
+	}
+}
+
+func mustNotDeclareJWT(operation *huma.Operation) {
+	if declaresJWT(operation) {
+		panic(fmt.Sprintf(
+			"operation %q declares a JWT requirement but is registered on the public group",
+			operation.OperationID,
+		))
+	}
+}
+
+func declaresJWT(operation *huma.Operation) bool {
+	for _, requirement := range operation.Security {
+		if _, ok := requirement[auth.DefaultJWTSchemeKey]; ok {
+			return true
+		}
+	}
+
+	return false
 }

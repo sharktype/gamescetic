@@ -20,7 +20,7 @@ type pool interface {
 	Ping(context.Context) error
 }
 
-func MustNew(pool *pgxpool.Pool) Client {
+func New(pool *pgxpool.Pool) Client {
 	return &store{
 		Queries: generated.New(pool),
 		db:      pool,

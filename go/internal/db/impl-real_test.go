@@ -15,7 +15,10 @@ func TestExecTx(t *testing.T) {
 	// Intentional: we must use the same DSN config for testing as the application, and we also
 	// must parse the entire config for tests to keep config consistent.
 
-	cfg := config.MustNew()
+	cfg, err := config.New()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	database := test_db.New(t, cfg.Clients.DB.DSN)
 

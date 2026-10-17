@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
+
+	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
 )
 
-func TestMustHandle(t *testing.T) {
+func TestHandle(t *testing.T) {
 	t.Run("the specification documents every operation", func(t *testing.T) {
-		response := get(newHandledRouter(t, newTestIDP(t)), "/openapi.json", "")
+		response := get(newHandledRouter(t, test_auth.NewIDP(t)), "/openapi.json", "")
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -30,9 +32,9 @@ func TestMustHandle(t *testing.T) {
 	})
 
 	t.Run("auth health answers with the viewer", func(t *testing.T) {
-		idp := newTestIDP(t)
+		idp := test_auth.NewIDP(t)
 
-		response := get(newHandledRouter(t, idp), "/health/auth", "Bearer "+idp.token(t, "sub-1"))
+		response := get(newHandledRouter(t, idp), "/health/auth", "Bearer "+idp.Token(t, "sub-1"))
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -52,9 +54,11 @@ func TestMustHandle(t *testing.T) {
 	})
 
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		idp := newTestIDP(t)
+		idp := test_auth.NewIDP(t)
 
-		code := get(newHandledRouter(t, idp), "/health/error", "Bearer "+idp.token(t, "sub-1")).Code
+		router := newHandledRouter(t, idp)
+
+		code := get(router, "/health/error", "Bearer "+idp.Token(t, "sub-1")).Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
 		}
@@ -68,7 +72,7 @@ func TestMustHandle(t *testing.T) {
 			)
 		}
 
-		idp := newTestIDP(t)
+		idp := test_auth.NewIDP(t)
 		router := newHandledRouter(t, idp)
 
 		for i := range publicRateLimit {
@@ -81,7 +85,7 @@ func TestMustHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		code := get(router, "/health/error", "Bearer "+idp.token(t, "sub-1")).Code
+		code := get(router, "/health/error", "Bearer "+idp.Token(t, "sub-1")).Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
 		}
@@ -95,7 +99,7 @@ func TestMustHandle(t *testing.T) {
 			)
 		}
 
-		router := newHandledRouter(t, newTestIDP(t))
+		router := newHandledRouter(t, test_auth.NewIDP(t))
 
 		for i := range securedRateLimit {
 			if code := get(

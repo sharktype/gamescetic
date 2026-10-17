@@ -1,27 +1,60 @@
 package routing
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/httprate"
+	"github.com/danielgtaylor/huma/v2"
+	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
 )
 
-func TestMustNewAPI(t *testing.T) {
-	idp := newTestIDP(t)
+func TestNewAPI(t *testing.T) {
+	idp := test_auth.NewIDP(t)
 
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
-		router, api := newTestAPI(t, idp, provisionedClients())
-		handler := registerProbe(api, nil)
+		router, public, _ := newTestAPI(t, idp, provisionedClients())
+		handler := test_auth.RegisterProbe(public, nil)
 
-		if code := get(router, probePath, "").Code; code != http.StatusOK {
+		if code := get(router, test_auth.ProbePath, "").Code; code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if !handler.ran {
+		if !handler.Ran {
 			t.Fatal("the handler did not run")
+		}
+	})
+
+	t.Run("the public group refuses an operation declaring a JWT requirement", func(t *testing.T) {
+		_, public, _ := newTestAPI(t, idp, provisionedClients())
+
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected a panic")
+			}
+		}()
+
+		test_auth.RegisterProbe(public, test_auth.RequireJWT())
+	})
+
+	t.Run("the secured group keeps scopes and documents one JWT requirement", func(t *testing.T) {
+		router, _, secured := newTestAPI(t, idp, provisionedClients())
+		handler := test_auth.RegisterProbe(secured, test_auth.RequireJWT("posts:read"))
+
+		code := get(router, test_auth.ProbePath, "Bearer "+idp.Token(t, "sub-1")).Code
+		if code != http.StatusForbidden {
+			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
+		}
+
+		if handler.Ran {
+			t.Fatal("the handler ran")
+		}
+
+		security := secured.OpenAPI().Paths[test_auth.ProbePath].Get.Security
+		if len(security) != 1 {
+			t.Fatalf("got %d documented security requirements, want 1", len(security))
 		}
 	})
 
@@ -40,23 +73,23 @@ func TestMustNewAPI(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			router, api := newTestAPI(t, idp, provisionedClients())
-			handler := registerProbe(api, requireJWT())
+			router, _, secured := newTestAPI(t, idp, provisionedClients())
+			handler := test_auth.RegisterProbe(secured, nil)
 
 			if code := get(
-				router, probePath, test.authorization,
+				router, test_auth.ProbePath, test.authorization,
 			).Code; code != http.StatusUnauthorized {
 				t.Fatalf("got %d, want %d", code, http.StatusUnauthorized)
 			}
 
-			if handler.ran {
+			if handler.Ran {
 				t.Fatal("the handler ran")
 			}
 		})
 	}
 }
 
-func TestMustNewRouter(t *testing.T) {
+func TestNewRouter(t *testing.T) {
 	t.Run("panics are recovered", func(t *testing.T) {
 		router := testRouter(t)
 
@@ -118,38 +151,53 @@ func TestMustNewRouter(t *testing.T) {
 	})
 }
 
-func TestLimitByRoute(t *testing.T) {
-	t.Run("limits by route pattern rather than URL path", func(t *testing.T) {
-		router := chi.NewMux()
+type thingInput struct {
+	ID string `path:"id"`
+}
 
-		router.Group(func(r chi.Router) {
-			r.Use(limitByRoute(map[string]func(http.Handler) http.Handler{
-				"/things/{id}": httprate.Limit(2, rateLimitWindow),
-			}))
+func TestRateLimit(t *testing.T) {
+	t.Run("limits by operation rather than URL path", func(t *testing.T) {
+		router, public, _ := newTestAPI(t, test_auth.NewIDP(t), provisionedClients())
 
-			r.Get("/things/{id}", func(writer http.ResponseWriter, _ *http.Request) {
-				writer.WriteHeader(http.StatusOK)
-			})
-
-			r.Get("/other", func(writer http.ResponseWriter, _ *http.Request) {
-				writer.WriteHeader(http.StatusOK)
-			})
+		huma.Register(public, huma.Operation{
+			OperationID: "GetThing",
+			Method:      http.MethodGet,
+			Path:        "/things/{id}",
+		}, func(context.Context, *thingInput) (*struct{}, error) {
+			return nil, nil
 		})
 
-		for _, id := range []string{"a", "b"} {
-			if code := get(router, "/things/"+id, "").Code; code != http.StatusOK {
-				t.Fatalf("%s: got %d, want %d", id, code, http.StatusOK)
+		for i := range publicRateLimit {
+			code := get(router, "/things/"+strconv.Itoa(i), "").Code
+			if code == http.StatusTooManyRequests {
+				t.Fatalf("request %d was throttled", i+1)
 			}
 		}
 
-		if code := get(router, "/things/c", "").Code; code != http.StatusTooManyRequests {
+		if code := get(router, "/things/other", "").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
+	})
 
-		// A route that is not listed falls through to whatever the router already applied.
+	t.Run("hitting the limit on one operation does not block another", func(t *testing.T) {
+		router, public, _ := newTestAPI(t, test_auth.NewIDP(t), provisionedClients())
 
-		if code := get(router, "/other", "").Code; code != http.StatusOK {
-			t.Fatalf("got %d, want %d", code, http.StatusOK)
+		test_auth.RegisterProbe(public, nil)
+
+		huma.Register(public, huma.Operation{
+			OperationID: "GetThing",
+			Method:      http.MethodGet,
+			Path:        "/things/{id}",
+		}, func(context.Context, *thingInput) (*struct{}, error) {
+			return nil, nil
+		})
+
+		for range publicRateLimit {
+			get(router, test_auth.ProbePath, "")
+		}
+
+		if code := get(router, "/things/a", "").Code; code == http.StatusTooManyRequests {
+			t.Fatal("exhausting one operation also exhausted another in the same group")
 		}
 	})
 }

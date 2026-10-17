@@ -3,6 +3,7 @@ package test_db
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/db"
 )
@@ -18,8 +19,16 @@ type Stub struct {
 
 var _ db.Client = (*Stub)(nil)
 
-func (s *Stub) GetUserBySub(context.Context, string) (generated.User, error) {
-	return s.User, s.UserErr
+func (s *Stub) GetUserBySub(_ context.Context, sub string) (generated.User, error) {
+	if s.UserErr != nil {
+		return generated.User{}, s.UserErr
+	}
+
+	if sub != s.User.Sub {
+		return generated.User{}, pgx.ErrNoRows
+	}
+
+	return s.User, nil
 }
 
 func (s *Stub) Ping(context.Context) error {

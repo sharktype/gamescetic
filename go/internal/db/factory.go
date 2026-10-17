@@ -4,22 +4,13 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sharktype/satchel/internal/utils"
 	"go.uber.org/zap"
 )
 
 // driver is the only supported database driver.
 const driver = "postgres"
 
-func MustNewPool(ctx context.Context, logger *zap.Logger, cfg Config) *pgxpool.Pool {
-	pool, err := newPool(ctx, logger, cfg)
-
-	utils.Must(err, "error creating database pool")
-
-	return pool
-}
-
-func newPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool, error) {
+func NewPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool, error) {
 	logger.Debug("connecting to database and testing connection...", zap.String("driver", driver))
 
 	pool, err := pgxpool.New(ctx, cfg.DSN)

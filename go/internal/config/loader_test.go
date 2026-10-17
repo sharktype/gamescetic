@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -25,8 +26,9 @@ func TestNewConfig(t *testing.T) {
 	t.Run("every setting is read", func(t *testing.T) {
 		setRequiredEnv(t)
 		t.Setenv("VERBOSE", "true")
+		t.Setenv("PORT", "8080")
 
-		cfg, err := newConfig()
+		cfg, err := New()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,6 +69,10 @@ func TestNewConfig(t *testing.T) {
 			t.Fatalf("got max age %d, want %d", cfg.CORS.MaxAge, 86400)
 		}
 
+		if cfg.Port != 8080 {
+			t.Fatalf("got port %d, want %d", cfg.Port, 8080)
+		}
+
 		if !cfg.Verbose {
 			t.Fatal("got verbose false, want true")
 		}
@@ -91,11 +97,63 @@ func TestNewConfig(t *testing.T) {
 				setRequiredEnv(t)
 				t.Setenv(key, "")
 
-				_, err := newConfig()
+				_, err := New()
 				if err == nil || !strings.Contains(err.Error(), key) {
 					t.Fatalf("got error %v, want it to mention %q", err, key)
 				}
 			})
 		}
 	})
+}
+
+func TestIsProduction(t *testing.T) {
+	t.Run("unset is not production", func(t *testing.T) {
+		t.Setenv("PRODUCTION", "")
+
+		if err := os.Unsetenv("PRODUCTION"); err != nil {
+			t.Fatal(err)
+		}
+
+		production, err := isProduction()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if production {
+			t.Fatal("got production")
+		}
+	})
+
+	t.Run(`"1" is production`, func(t *testing.T) {
+		t.Setenv("PRODUCTION", "1")
+
+		production, err := isProduction()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if !production {
+			t.Fatal("got not production")
+		}
+	})
+
+	invalidTests := []struct {
+		name  string
+		value string
+	}{
+		{name: "empty", value: ""},
+		{name: "zero", value: "0"},
+		{name: "true", value: "true"},
+		{name: "false", value: "false"},
+	}
+
+	for _, test := range invalidTests {
+		t.Run("rejects "+test.name, func(t *testing.T) {
+			t.Setenv("PRODUCTION", test.value)
+
+			if _, err := isProduction(); err == nil {
+				t.Fatalf("expected an error for %q", test.value)
+			}
+		})
+	}
 }

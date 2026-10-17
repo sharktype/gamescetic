@@ -9,7 +9,7 @@ import (
 
 func TestNewPool(t *testing.T) {
 	t.Run("an unparseable DSN is rejected", func(t *testing.T) {
-		pool, err := newPool(context.Background(), zap.NewNop(), Config{DSN: "not-a-dsn"})
+		pool, err := NewPool(context.Background(), zap.NewNop(), Config{DSN: "not-a-dsn"})
 
 		if pool != nil {
 			t.Fatal("expected no pool")

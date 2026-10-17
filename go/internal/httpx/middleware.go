@@ -2,17 +2,19 @@ package httpx
 
 import (
 	"errors"
+	"fmt"
 	nethttp "net/http"
 	"strings"
 
 	"github.com/go-chi/cors"
-	"github.com/sharktype/satchel/internal/utils"
 )
 
 type Middleware = func(next nethttp.Handler) nethttp.Handler
 
-func MustNewCORSHandler(cfg CORSConfig) Middleware {
-	utils.Must(validate(cfg.AllowedOrigins), "invalid CORS configuration")
+func NewCORSHandler(cfg CORSConfig) (Middleware, error) {
+	if err := validate(cfg.AllowedOrigins); err != nil {
+		return nil, fmt.Errorf("invalid CORS configuration: %w", err)
+	}
 
 	return cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
@@ -21,7 +23,7 @@ func MustNewCORSHandler(cfg CORSConfig) Middleware {
 		ExposedHeaders:   cfg.ExposedHeaders,
 		AllowCredentials: cfg.AllowCredentials,
 		MaxAge:           cfg.MaxAge,
-	})
+	}), nil
 }
 
 func SecurityHeaders() Middleware {

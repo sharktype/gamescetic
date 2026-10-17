@@ -45,7 +45,7 @@ func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Ro
 	t.Helper()
 
 	router := chi.NewMux()
-	api := MustNewAPI(
+	public, secured := NewAPI(
 		router,
 		huma.DefaultConfig("test", "0.0.0"),
 		idp.cache,
@@ -60,9 +60,14 @@ func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Ro
 func testRouter(t *testing.T) *chi.Mux {
 	t.Helper()
 
-	return MustNewRouter(httpx.MustNewCORSHandler(httpx.CORSConfig{
+	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins: []string{"http://example.com"},
-	}))
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return NewRouter(corsHandler)
 }
 
 func newHandledRouter(t *testing.T, idp *testIDP) http.Handler {
@@ -70,14 +75,16 @@ func newHandledRouter(t *testing.T, idp *testIDP) http.Handler {
 
 	router := testRouter(t)
 
-	MustHandle(
+	if err := Handle(
 		t.Context(),
 		zap.NewNop(),
 		router,
 		provisionedClients(),
 		huma.DefaultConfig("test", "1"),
-		idp.config(),
-	)
+		idp.Config(),
+	); err != nil {
+		t.Fatal(err)
+	}
 
 	return router
 }
