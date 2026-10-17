@@ -42,8 +42,10 @@ func newRouter(config cors.Config) (*chi.Mux, error) {
 
 	// Careful: we don't throttle; be careful and set up infra-level throttling/rate limiting.
 
+	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
+	// attacker-controlled to bypass rate limits or other IP restrictions.
+
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
