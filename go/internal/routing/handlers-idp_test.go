@@ -1,8 +1,9 @@
 package routing
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
-	"crypto/rsa"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -29,7 +30,7 @@ type testIDP struct {
 func newTestIDP(t *testing.T) *testIDP {
 	t.Helper()
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func (i *testIDP) tokenWithScopes(t *testing.T, sub string, scopes []string) str
 		}
 	}
 
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.RS256(), i.signingKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), i.signingKey))
 	if err != nil {
 		t.Fatal(err)
 	}
