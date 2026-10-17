@@ -51,11 +51,9 @@ func GetDatabaseHealth(
 ) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}
-		_, err := clients.DB.Placeholder(ctx)
-		if err != nil {
-			logger.Error("database health check failed", zap.Error(err))
 
-			resp.Body.Message = "database connection failed"
+		if _, err := clients.DB.Placeholder(ctx); err != nil {
+			logger.Error("database health check failed", zap.Error(err))
 
 			return resp, huma.Error503ServiceUnavailable("database unavailable")
 		}
@@ -67,8 +65,5 @@ func GetDatabaseHealth(
 }
 
 func GetErrorHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
-	resp := &GetHealthOutput{}
-	resp.Body.Message = "error health check"
-
-	return resp, huma.Error500InternalServerError("intentional error for health check")
+	return nil, huma.Error500InternalServerError("intentional error for health check")
 }
