@@ -3,6 +3,8 @@ WORKDIR /app
 
 RUN apk add --no-cache git
 
+ENV CGO_ENABLED=0
+
 COPY go.mod go.sum ./
 RUN go mod download
 
@@ -11,11 +13,9 @@ RUN go install -C ./tools github.com/pressly/goose/v3/cmd/goose
 
 COPY . .
 
-ENV CGO_ENABLED=0
-
 RUN go build -o main .
 
-FROM golang:1.27-alpine AS runner
+FROM alpine:3 AS runner
 WORKDIR /app
 
 COPY --from=builder /app/main .
