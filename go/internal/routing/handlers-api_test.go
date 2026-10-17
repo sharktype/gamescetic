@@ -176,16 +176,42 @@ func TestMustNewAPI(t *testing.T) {
 }
 
 func TestMustNewRouter(t *testing.T) {
-	router := MustNewRouter([]string{"http://example.com"}, nil, nil, nil, false, 0)
+	t.Run("panics are recovered", func(t *testing.T) {
+		router := MustNewRouter([]string{"http://example.com"}, nil, nil, nil, false, 0)
 
-	router.Get("/panic", func(http.ResponseWriter, *http.Request) {
-		panic("arbitrary panic")
+		router.Get("/panic", func(http.ResponseWriter, *http.Request) {
+			panic("arbitrary panic")
+		})
+
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/panic", nil))
+
+		if response.Code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
+		}
 	})
 
-	response := httptest.NewRecorder()
-	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/panic", nil))
+	t.Run("the global limiter covers ping", func(t *testing.T) {
+		router := MustNewRouter([]string{"http://example.com"}, nil, nil, nil, false, 0)
 
-	if response.Code != http.StatusInternalServerError {
-		t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
-	}
+		// chi only runs its middleware once the mux has a route.
+
+		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
+
+		for i := 0; i < globalRateLimit; i++ {
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ping", nil))
+
+			if response.Code != http.StatusOK {
+				t.Fatalf("request %d: got %d, want %d", i+1, response.Code, http.StatusOK)
+			}
+		}
+
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ping", nil))
+
+		if response.Code != http.StatusTooManyRequests {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusTooManyRequests)
+		}
+	})
 }

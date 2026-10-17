@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
@@ -56,8 +55,16 @@ func handle(
 
 	// Reminder: default body size limit is 1 MiB.
 
+	// Fallback rate limit (100 /s).
+
+	// Group 1 (rate limit 50 /s).
+
 	r.Group(func(r chi.Router) {
-		r.Use(httprate.LimitByIP(100, 1*time.Minute))
+		r.Use(httprate.Limit(
+			50,
+			rateLimitWindow,
+			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
+		))
 
 		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
 
@@ -69,10 +76,14 @@ func handle(
 		}, withErrorLogging(logger, "GetHealth", health.GetHealth))
 	})
 
-	// Expected to all be authenticated:
+	// Group 2 (rate limit 30 /s).
 
 	r.Group(func(r chi.Router) {
-		r.Use(httprate.LimitByIP(100, 1*time.Minute))
+		r.Use(httprate.Limit(
+			30,
+			rateLimitWindow,
+			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
+		))
 
 		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
 
@@ -107,9 +118,6 @@ func handle(
 			},
 			withErrorLogging(logger, "GetAuthHealth", health.GetAuthHealth),
 		)
-
-		// As this will cause a very loud error in o11y, it is strongly recommended to remove this
-		// as soon as you are satisfied that your error handling is working as expected.
 
 		huma.Register(
 			api,

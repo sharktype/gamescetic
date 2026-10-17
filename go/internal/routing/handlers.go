@@ -7,6 +7,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httprate"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
@@ -17,6 +18,9 @@ import (
 const (
 	requestTimeout   = 60 * time.Second
 	compressionLevel = 5
+
+	globalRateLimit = 100
+	rateLimitWindow = time.Minute
 )
 
 func MustNewAPI(
@@ -42,9 +46,6 @@ func MustNewRouter(
 ) *chi.Mux {
 	router := chi.NewMux()
 
-	// Careful: we don't throttle; be careful and set up infra-level throttling/rate limiting.
-	// TODO: Can we throttle?
-
 	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
 	// attacker-controlled to bypass rate limits or other IP restrictions.
 
@@ -56,7 +57,6 @@ func MustNewRouter(
 	router.Use(middleware.GetHead)
 	router.Use(middleware.Timeout(requestTimeout))
 	router.Use(middleware.Compress(compressionLevel))
-	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(http.MustNewCORSHandler(
 		allowedOrigins,
 		allowedMethods,
@@ -65,6 +65,11 @@ func MustNewRouter(
 		allowCredentials,
 		maxAge,
 	))
+
+	// Counts per replica so remember to keep volumetric throttling at the edge too.
+
+	router.Use(httprate.LimitByIP(globalRateLimit, rateLimitWindow))
+	router.Use(middleware.Heartbeat("/ping"))
 
 	return router
 }
