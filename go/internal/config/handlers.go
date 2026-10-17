@@ -21,7 +21,7 @@ func MustNew(logger *zap.Logger) *Config {
 }
 
 func newConfig(logger *zap.Logger) (*Config, error) {
-	if !utils.IsProduction() {
+	if !utils.MustIsProduction() {
 		logger.Info("app booting in development mode...")
 
 		if err := loadDotEnv(); err != nil {

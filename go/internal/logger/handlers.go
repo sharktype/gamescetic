@@ -21,7 +21,7 @@ func newLogger() (*zap.Logger, error) {
 	}
 
 	config := zap.NewDevelopmentConfig()
-	if utils.IsProduction() {
+	if utils.MustIsProduction() {
 		config = zap.NewProductionConfig()
 	}
 

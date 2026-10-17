@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-func IsProduction() bool {
+func MustIsProduction() bool {
 	production, isSet := os.LookupEnv("PRODUCTION")
 	if !isSet {
 		return false

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestIsProduction(t *testing.T) {
+func TestMustIsProduction(t *testing.T) {
 	t.Run("unset is not production", func(t *testing.T) {
 		previous, wasSet := os.LookupEnv("PRODUCTION")
 
@@ -17,7 +17,7 @@ func TestIsProduction(t *testing.T) {
 
 		_ = os.Unsetenv("PRODUCTION")
 
-		if IsProduction() {
+		if MustIsProduction() {
 			t.Fatal("got production")
 		}
 	})
@@ -25,7 +25,7 @@ func TestIsProduction(t *testing.T) {
 	t.Run(`"1" is production`, func(t *testing.T) {
 		t.Setenv("PRODUCTION", "1")
 
-		if !IsProduction() {
+		if !MustIsProduction() {
 			t.Fatal("got not production")
 		}
 	})
@@ -50,7 +50,7 @@ func TestIsProduction(t *testing.T) {
 				}
 			}()
 
-			IsProduction()
+			MustIsProduction()
 		})
 	}
 }
