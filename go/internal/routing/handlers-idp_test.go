@@ -16,8 +16,6 @@ import (
 	"github.com/sharktype/satchel/internal/auth"
 )
 
-// No tests in this file; this is just the identity provider (IDP) helper.
-
 type testIDP struct {
 	JWKSURL  string
 	Issuer   string

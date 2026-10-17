@@ -71,7 +71,6 @@ func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	return router
 }
 
-// limitByRoute applies a separate rate limiter per route pattern.
 func limitByRoute(
 	limiters map[string]func(http.Handler) http.Handler,
 ) func(http.Handler) http.Handler {

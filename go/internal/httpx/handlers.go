@@ -9,7 +9,6 @@ import (
 	"github.com/sharktype/satchel/internal/utils"
 )
 
-// Middleware matches chi's middleware signature.
 type Middleware = func(next nethttp.Handler) nethttp.Handler
 
 func MustNewCORSHandler(cfg CORSConfig) Middleware {

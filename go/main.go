@@ -16,6 +16,7 @@ import (
 	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
+	"go.uber.org/zap"
 )
 
 const readHeaderTimeout = 5 * time.Second
@@ -83,7 +84,7 @@ func main() {
 		}
 
 		hooks.OnStart(func() {
-			logger.Info(fmt.Sprintf("starting server on port %d", options.Port))
+			logger.Info("starting server", zap.Int("port", options.Port))
 			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				panic(err)
 			}
@@ -94,7 +95,7 @@ func main() {
 			defer cancel()
 
 			if err := server.Shutdown(shutdownCtx); err != nil {
-				logger.Error(fmt.Sprintf("error shutting down server: %v", err))
+				logger.Error("error shutting down server", zap.Error(err))
 			}
 
 			_ = logger.Sync()

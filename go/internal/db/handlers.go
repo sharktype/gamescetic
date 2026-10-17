@@ -2,7 +2,6 @@ package db
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sharktype/satchel/internal/utils"
@@ -21,7 +20,7 @@ func MustNewPool(ctx context.Context, logger *zap.Logger, cfg Config) *pgxpool.P
 }
 
 func newPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool, error) {
-	logger.Debug(fmt.Sprintf("connecting to %s and testing connection...", driver))
+	logger.Debug("connecting to database and testing connection...", zap.String("driver", driver))
 
 	pool, err := pgxpool.New(ctx, cfg.DSN)
 	if err != nil {
@@ -32,7 +31,7 @@ func newPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool
 		return nil, err
 	}
 
-	logger.Info(fmt.Sprintf("%s connection successful", driver))
+	logger.Info("database connection successful", zap.String("driver", driver))
 
 	return pool, nil
 }

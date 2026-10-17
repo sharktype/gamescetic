@@ -132,7 +132,6 @@ func MustSingleJWTRequirement(_ *huma.OpenAPI, operation *huma.Operation) {
 	}
 }
 
-// parseToken verifies the signature and claims of a bearer token.
 func parseToken(
 	ctx context.Context,
 	cache *jwk.Cache,
