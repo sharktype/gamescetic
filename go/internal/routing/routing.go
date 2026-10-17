@@ -53,6 +53,22 @@ func handle(
 		return err
 	}
 
+	// huma registers these as plain routes; gate on the router rather than through the middleware.
+
+	r.Use(auth.RequireTokenForPaths(
+		jwtCache,
+		jwksURL,
+		issuer,
+		audience,
+		[]string{
+			humaConfig.DocsPath,
+			humaConfig.OpenAPIPath + ".json",
+			humaConfig.OpenAPIPath + ".yaml",
+			humaConfig.OpenAPIPath + "-3.0.json",
+			humaConfig.OpenAPIPath + "-3.0.yaml",
+		},
+	))
+
 	// Reminder: default body size limit is 1 MiB.
 
 	// Fallback rate limit (100 /s).
