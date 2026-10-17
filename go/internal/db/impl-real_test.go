@@ -43,7 +43,7 @@ func TestExecTx(t *testing.T) {
 	t.Run("rolls back when the callback fails", func(t *testing.T) {
 		database.CleanupAfter(t)
 
-		boom := errors.New("boom")
+		expectedErr := errors.New("arbitrary error")
 
 		err := database.ExecTx(t.Context(), func(tx db.Client) error {
 			if err := tx.SetMeta(t.Context(), sqlc.SetMetaParams{
@@ -53,10 +53,10 @@ func TestExecTx(t *testing.T) {
 				return err
 			}
 
-			return boom
+			return expectedErr
 		})
-		if !errors.Is(err, boom) {
-			t.Fatalf("got error %v, want %v", err, boom)
+		if !errors.Is(err, expectedErr) {
+			t.Fatalf("got error %v, want %v", err, expectedErr)
 		}
 
 		if _, err := database.GetMeta(t.Context(), "meta-1"); !errors.Is(err, pgx.ErrNoRows) {
