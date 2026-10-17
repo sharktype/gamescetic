@@ -11,7 +11,9 @@ import (
 
 type (
 	Driver string
-	DSN    string
+
+	// DSN is the Postgres connection string; use sslmode=verify-full in production.
+	DSN string
 )
 
 func MustNewPool(ctx context.Context, logger *zap.Logger, driver Driver, dsn DSN) *pgxpool.Pool {
