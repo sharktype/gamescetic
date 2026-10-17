@@ -15,7 +15,7 @@ ENV CGO_ENABLED=0
 
 RUN go build -o main .
 
-FROM golang:1.26-alpine AS runner
+FROM golang:1.27-alpine AS runner
 WORKDIR /app
 
 COPY --from=builder /app/main .
