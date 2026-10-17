@@ -52,7 +52,7 @@ func GetDatabaseHealth(
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}
 
-		if _, err := clients.DB.Placeholder(ctx); err != nil {
+		if err := clients.DB.Ping(ctx); err != nil {
 			logger.Error("database health check failed", zap.Error(err))
 
 			return resp, huma.Error503ServiceUnavailable("database unavailable")

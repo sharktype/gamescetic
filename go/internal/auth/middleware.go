@@ -12,6 +12,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/sharktype/satchel/generated"
 	"go.uber.org/zap"
 )
 
@@ -21,6 +22,18 @@ const (
 	subjectKey contextKey = iota
 	userKey
 )
+
+func SubjectFromContext(ctx context.Context) (string, bool) {
+	s, ok := ctx.Value(subjectKey).(string)
+
+	return s, ok && s != ""
+}
+
+func ViewerFromContext(ctx context.Context) (generated.User, bool) {
+	user, ok := ctx.Value(userKey).(generated.User)
+
+	return user, ok
+}
 
 // RequireUserMiddleware requires an authenticated user is in context.
 //

@@ -6,14 +6,14 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/internal/clients"
-	dbtest "github.com/sharktype/satchel/internal/db-test"
+	test_db "github.com/sharktype/satchel/internal/db/test-db"
 )
 
 func TestRequireUserMiddleware(t *testing.T) {
 	idp := newTestIDP(t)
 
 	t.Run("a user that is not provisioned is forbidden", func(t *testing.T) {
-		unprovisioned := &clients.Clients{DB: &dbtest.Stub{UserErr: pgx.ErrNoRows}}
+		unprovisioned := &clients.Clients{DB: &test_db.Stub{UserErr: pgx.ErrNoRows}}
 
 		router, api := newTestAPI(t, idp, unprovisioned)
 		handler := registerProbe(api, requireJWT())

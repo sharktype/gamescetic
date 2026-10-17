@@ -17,6 +17,7 @@ type store struct {
 
 type pool interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
+	Ping(context.Context) error
 }
 
 func MustNew(pool *pgxpool.Pool) Client {
@@ -28,6 +29,10 @@ func MustNew(pool *pgxpool.Pool) Client {
 
 func (s *store) IsTx() bool {
 	return s.inTx
+}
+
+func (s *store) Ping(ctx context.Context) error {
+	return s.db.Ping(ctx)
 }
 
 func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {

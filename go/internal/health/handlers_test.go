@@ -10,14 +10,14 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/clients"
-	dbtest "github.com/sharktype/satchel/internal/db-test"
+	test_db "github.com/sharktype/satchel/internal/db/test-db"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func TestGetDatabaseHealth(t *testing.T) {
 	t.Run("a reachable database reports OK", func(t *testing.T) {
-		output, err := GetDatabaseHealth(zap.NewNop(), &clients.Clients{DB: &dbtest.Stub{}})(
+		output, err := GetDatabaseHealth(zap.NewNop(), &clients.Clients{DB: &test_db.Stub{}})(
 			context.Background(), &GetHealthInput{},
 		)
 		if err != nil {
@@ -41,7 +41,7 @@ func TestGetDatabaseHealth(t *testing.T) {
 		))
 
 		_, err := GetDatabaseHealth(
-			logger, &clients.Clients{DB: &dbtest.Stub{PlaceholderErr: cause}},
+			logger, &clients.Clients{DB: &test_db.Stub{PingErr: cause}},
 		)(context.Background(), &GetHealthInput{})
 		if err == nil {
 			t.Fatal("expected an error")

@@ -13,7 +13,7 @@ type Stub struct {
 	User    generated.User
 	UserErr error
 
-	PlaceholderErr error
+	PingErr error
 }
 
 var _ db.Client = (*Stub)(nil)
@@ -22,6 +22,6 @@ func (s *Stub) GetUserBySub(context.Context, string) (generated.User, error) {
 	return s.User, s.UserErr
 }
 
-func (s *Stub) Placeholder(context.Context) (string, error) {
-	return "OK", s.PlaceholderErr
+func (s *Stub) Ping(context.Context) error {
+	return s.PingErr
 }

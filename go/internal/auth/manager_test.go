@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/generated"
-	dbtest "github.com/sharktype/satchel/internal/db-test"
+	test_db "github.com/sharktype/satchel/internal/db/test-db"
 )
 
 func TestRequireUser(t *testing.T) {
@@ -44,7 +44,7 @@ func TestRequireUser(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stub := &dbtest.Stub{User: test.user, UserErr: test.userErr}
+			stub := &test_db.Stub{User: test.user, UserErr: test.userErr}
 
 			user, err := NewManager(stub).RequireUser(context.Background(), "sub-1")
 

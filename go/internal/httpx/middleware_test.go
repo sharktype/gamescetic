@@ -53,9 +53,11 @@ func TestValidate(t *testing.T) {
 }
 
 func TestSecurityHeaders(t *testing.T) {
-	handler := SecurityHeaders()(nethttp.HandlerFunc(func(writer nethttp.ResponseWriter, _ *nethttp.Request) {
-		writer.WriteHeader(nethttp.StatusNoContent)
-	}))
+	handler := SecurityHeaders()(
+		nethttp.HandlerFunc(func(writer nethttp.ResponseWriter, _ *nethttp.Request) {
+			writer.WriteHeader(nethttp.StatusNoContent)
+		}),
+	)
 
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, httptest.NewRequest(nethttp.MethodGet, "/", nil))

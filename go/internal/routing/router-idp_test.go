@@ -58,9 +58,11 @@ func newTestIDP(t *testing.T) *testIDP {
 		t.Fatal(err)
 	}
 
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-		_, _ = writer.Write(jwks)
-	}))
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, _ = writer.Write(jwks)
+		}),
+	)
 	t.Cleanup(server.Close)
 
 	cache, err := auth.NewJWKSet(t.Context(), server.URL)

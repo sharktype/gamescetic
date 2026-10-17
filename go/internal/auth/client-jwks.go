@@ -7,7 +7,6 @@ import (
 
 	"github.com/lestrrat-go/httprc/v3"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/sharktype/satchel/generated"
 )
 
 const DefaultJWTSchemeKey = "JWT"
@@ -34,16 +33,4 @@ func NewJWKSet(ctx context.Context, jwkUrl string) (*jwk.Cache, error) {
 	}
 
 	return jwkCache, nil
-}
-
-func SubjectFromContext(ctx context.Context) (string, bool) {
-	s, ok := ctx.Value(subjectKey).(string)
-
-	return s, ok && s != ""
-}
-
-func ViewerFromContext(ctx context.Context) (generated.User, bool) {
-	user, ok := ctx.Value(userKey).(generated.User)
-
-	return user, ok
 }

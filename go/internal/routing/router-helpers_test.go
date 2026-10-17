@@ -11,7 +11,7 @@ import (
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
-	dbtest "github.com/sharktype/satchel/internal/db-test"
+	test_db "github.com/sharktype/satchel/internal/db/test-db"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
@@ -38,7 +38,7 @@ func provisionedUser() generated.User {
 }
 
 func provisionedClients() *clients.Clients {
-	return &clients.Clients{DB: &dbtest.Stub{User: provisionedUser()}}
+	return &clients.Clients{DB: &test_db.Stub{User: provisionedUser()}}
 }
 
 func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Router, huma.API) {

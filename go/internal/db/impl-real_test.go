@@ -8,13 +8,16 @@ import (
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
-	dbtest "github.com/sharktype/satchel/internal/db-test"
+	test_db "github.com/sharktype/satchel/internal/db/test-db"
 )
 
 func TestExecTx(t *testing.T) {
+	// Intentional: we must use the same DSN config for testing as the application, and we also
+	// must parse the entire config for tests to keep config consistent.
+
 	cfg := config.MustNew()
 
-	database := dbtest.New(t, cfg.Clients.DB.DSN)
+	database := test_db.New(t, cfg.Clients.DB.DSN)
 
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)
