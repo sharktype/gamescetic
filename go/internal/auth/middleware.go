@@ -53,18 +53,17 @@ func RequireUserMiddleware(
 	}
 }
 
-// NewJWTAuthMiddleware places the subject based on JWT auth in the context.
 func NewJWTAuthMiddleware(
 	api huma.API, cache *jwk.Cache, jwksURL, issuer, audience string,
 ) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		var neededScopes []string
 		required := false
 
-		for _, opScheme := range ctx.Operation().Security {
-			if scopes, ok := opScheme[DefaultJWTSchemeKey]; ok {
-				neededScopes = scopes
+		var neededScopes []string
+		for _, requirement := range ctx.Operation().Security {
+			if scopes, ok := requirement[DefaultJWTSchemeKey]; ok {
 				required = true
+				neededScopes = scopes
 
 				break
 			}
@@ -111,8 +110,8 @@ func NewJWTAuthMiddleware(
 
 		ctx = huma.WithValue(ctx, subjectKey, sub)
 
-		if len(neededScopes) == 0 {
-			next(ctx)
+		if !hasAllScopes(parsed, neededScopes) {
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
 		}
@@ -121,16 +120,42 @@ func NewJWTAuthMiddleware(
 	}
 }
 
-					return
-				}
+func hasAllScopes(token jwt.Token, wanted []string) bool {
+	granted := grantedScopes(token)
+
+	for _, scope := range wanted {
+		if !slices.Contains(granted, scope) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func grantedScopes(token jwt.Token) []string {
+	var claim any
+	if err := token.Get("scopes", &claim); err != nil {
+		return nil
+	}
+
+	switch scopes := claim.(type) {
+	case []string:
+		return scopes
+	case []any:
+		granted := make([]string, 0, len(scopes))
+
+		for _, entry := range scopes {
+			if scope, ok := entry.(string); ok {
+				granted = append(granted, scope)
 			}
 		}
 
-		_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
+		return granted
 	}
+
+	return nil
 }
 
-// bearerToken extracts the token from an Authorization header value.
 func bearerToken(header string) (string, bool) {
 	const prefix = "Bearer "
 
