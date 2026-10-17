@@ -31,7 +31,7 @@ func GetAuthHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, erro
 }
 
 func GetDatabaseHealth(
-	clients *clients.Clients, logger *zap.Logger,
+	logger *zap.Logger, clients *clients.Clients,
 ) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}

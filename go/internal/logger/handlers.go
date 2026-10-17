@@ -1,17 +1,15 @@
 package logger
 
 import (
-	"fmt"
 	"os"
 
+	"github.com/sharktype/satchel/internal/utils"
 	"go.uber.org/zap"
 )
 
 func MustNew() *zap.Logger {
 	logger, err := newLogger()
-	if err != nil {
-		panic(fmt.Sprintf("error creating logger: %v", err))
-	}
+	utils.Must(err, "error creating logger")
 
 	return logger
 }
@@ -23,7 +21,7 @@ func newLogger() (*zap.Logger, error) {
 	}
 
 	config := zap.NewDevelopmentConfig()
-	if os.Getenv("PRODUCTION") != "" {
+	if utils.IsProduction() {
 		config = zap.NewProductionConfig()
 	}
 
