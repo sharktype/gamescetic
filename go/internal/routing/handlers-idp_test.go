@@ -43,11 +43,6 @@ func newTestIDP(t *testing.T) *testIDP {
 		t.Fatal(err)
 	}
 
-	// jwx ignores JWKS keys that do not name an algorithm.
-	if err := signingKey.Set(jwk.AlgorithmKey, jwa.RS256()); err != nil {
-		t.Fatal(err)
-	}
-
 	set := jwk.NewSet()
 	if err := set.AddKey(signingKey); err != nil {
 		t.Fatal(err)

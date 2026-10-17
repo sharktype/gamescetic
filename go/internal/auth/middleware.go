@@ -8,6 +8,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"go.uber.org/zap"
 )
@@ -89,8 +90,10 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
+		// A lot of providers omit the signing algorithm, but we can infer it from the key type.
+
 		parsed, err := jwt.ParseString(token,
-			jwt.WithKeySet(keySet),
+			jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
 			jwt.WithValidate(true),
 			jwt.WithIssuer(issuer),
 			jwt.WithAudience(audience),
