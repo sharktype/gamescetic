@@ -47,7 +47,7 @@ func handle(
 
 	humaConfig.OnAddOperation = append(humaConfig.OnAddOperation, auth.MustSingleJWTRequirement)
 
-	if authConfig.JWKSURL == "" || authConfig.JWKSURL == "<snip>" {
+	if authConfig.JWKSURL == "" {
 		return fmt.Errorf("AUTH_JWKSURL is not set in the environment variables")
 	}
 
