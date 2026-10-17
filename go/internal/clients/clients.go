@@ -22,7 +22,7 @@ func MustNew(ctx context.Context, cfg *Config, logger *zap.Logger) *Clients {
 }
 
 func new(ctx context.Context, cfg *Config, logger *zap.Logger) (*Clients, error) {
-	database, err := db.New(ctx, cfg.DB, logger)
+	database, err := db.NewPool(ctx, cfg.DB, logger)
 	if err != nil {
 		return nil, err
 	}
