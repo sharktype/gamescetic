@@ -8,20 +8,19 @@ import (
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
+	"github.com/sharktype/satchel/internal/utils"
 	"go.uber.org/zap"
 )
 
 func MustNew(logger *zap.Logger) *Config {
 	cfg, err := newConfig(logger)
-	if err != nil {
-		panic(fmt.Sprintf("error loading config: %v", err))
-	}
+	utils.Must(err, "error loading config")
 
 	return cfg
 }
 
 func newConfig(logger *zap.Logger) (*Config, error) {
-	if os.Getenv("PRODUCTION") == "" {
+	if !utils.IsProduction() {
 		logger.Info("app booting in development mode...")
 
 		if err := loadDotEnv(); err != nil {

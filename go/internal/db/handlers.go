@@ -2,18 +2,16 @@ package db
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sharktype/satchel/internal/utils"
 	"go.uber.org/zap"
 )
 
-func MustNewPool(ctx context.Context, cfg *Config, logger *zap.Logger) *pgxpool.Pool {
-	pool, err := newPool(ctx, cfg, logger)
-	if err != nil {
-		panic(fmt.Sprintf("error creating database pool: %v", err))
-	}
+func MustNewPool(ctx context.Context, logger *zap.Logger, driver, dsn string) *pgxpool.Pool {
+	pool, err := newPool(ctx, logger, driver, dsn)
+	utils.Must(err, "error creating database pool")
 
 	return pool
 }
