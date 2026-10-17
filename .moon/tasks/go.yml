@@ -7,6 +7,7 @@ fileGroups:
     configs:
         - "go.mod"
         - "go.sum"
+        - ".golangci.yml"
     sources:
         - "**/*.go"
     tests:

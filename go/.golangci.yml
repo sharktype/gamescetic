@@ -1,0 +1,21 @@
+version: "2"
+
+linters:
+    enable:
+        - depguard
+
+    settings:
+        depguard:
+            rules:
+                config-is-a-leaf:
+                    list-mode: lax
+                    files:
+                        - "$all"
+                        - "!$test"
+                        - "!**/main.go"
+                        - "!**/internal/config/**"
+                    deny:
+                        - pkg: "github.com/sharktype/satchel/internal/config"
+                          desc: >-
+                              config is a leaf imported only by main; declare the settings your package needs in
+                              its own package and let main map between them
