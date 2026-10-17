@@ -2,8 +2,10 @@ package health
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"go.uber.org/zap"
 )
@@ -16,6 +18,12 @@ type GetHealthOutput struct {
 	}
 }
 
+type GetAuthHealthOutput struct {
+	Body struct {
+		Message string `json:"message" example:"user-1 OK" doc:"health check response message"`
+	}
+}
+
 func GetHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 	resp := &GetHealthOutput{}
 	resp.Body.Message = "OK"
@@ -23,9 +31,17 @@ func GetHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 	return resp, nil
 }
 
-func GetAuthHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
-	resp := &GetHealthOutput{}
-	resp.Body.Message = "OK"
+func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput, error) {
+	resp := &GetAuthHealthOutput{}
+
+	user, ok := auth.ViewerFromContext(ctx)
+	if !ok {
+		resp.Body.Message = "no authenticated user in context"
+
+		return resp, huma.Error500InternalServerError("authenticated request has no user")
+	}
+
+	resp.Body.Message = fmt.Sprintf("%s OK", user.ID)
 
 	return resp, nil
 }
