@@ -14,11 +14,8 @@ import (
 
 func TestExecTx(t *testing.T) {
 	cfg := config.MustNew(logger.MustNew())
-	if cfg.Clients.DB == nil || cfg.Clients.DB.DSN == nil {
-		t.Skip("CLIENTS_DB_DSN is not set")
-	}
 
-	database := dbtest.New(t, *cfg.Clients.DB.DSN)
+	database := dbtest.New(t, cfg.Clients.DB.DSN)
 
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)
