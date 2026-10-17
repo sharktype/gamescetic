@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humacli"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/config"
@@ -32,18 +31,28 @@ func main() {
 
 	logger := logger.MustNew()
 	cfg := config.MustNew(logger)
-	appClients := clients.MustNew(ctx, &cfg.Clients, logger)
+	appClients := clients.MustNew(ctx, logger, cfg.Clients.DB.Driver, cfg.Clients.DB.DSN)
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		router := routing.MustNewRouter(cfg.CORS)
+		router := routing.MustNewRouter(
+			cfg.CORS.AllowedOrigins,
+			cfg.CORS.AllowedMethods,
+			cfg.CORS.AllowedHeaders,
+			cfg.CORS.ExposedHeaders,
+			cfg.CORS.AllowCredentials,
+			cfg.CORS.MaxAge,
+		)
 
 		routing.MustHandle(
 			ctx,
-			router,
-			huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
-			cfg,
-			appClients,
 			logger,
+			router,
+			appClients,
+			cfg.API.Title,
+			cfg.API.Version,
+			cfg.Auth.JWKSURL,
+			cfg.Auth.Issuer,
+			cfg.Auth.Audience,
 		)
 
 		server := &http.Server{
