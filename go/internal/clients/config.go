@@ -1,10 +1,7 @@
 package clients
 
-type Config struct {
-	DB *DB `envPrefix:"DB_" env:",init"`
-}
+import "github.com/sharktype/satchel/internal/db"
 
-type DB struct {
-	Driver *string `env:"DRIVER"`
-	DSN    *string `env:"DSN"`
+type Config struct {
+	DB *db.Config `envPrefix:"DB_" env:",init"`
 }

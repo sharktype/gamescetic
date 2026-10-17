@@ -8,6 +8,7 @@ sql:
               package: "db"
               out: "db"
               sql_package: "pgx/v5"
+              emit_interface: true
 
               # Without these, we need to deal with raw types like Text and check Valid.
 
