@@ -1,7 +1,9 @@
 package auth
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -83,21 +85,7 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
-		keySet, err := cache.Lookup(ctx.Context(), jwksURL)
-		if err != nil {
-			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
-
-			return
-		}
-
-		// A lot of providers omit the signing algorithm, but we can infer it from the key type.
-
-		parsed, err := jwt.ParseString(token,
-			jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
-			jwt.WithValidate(true),
-			jwt.WithIssuer(issuer),
-			jwt.WithAudience(audience),
-		)
+		parsed, err := parseToken(ctx.Context(), cache, jwksURL, issuer, audience, token)
 		if err != nil {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
@@ -120,6 +108,75 @@ func NewJWTAuthMiddleware(
 		}
 
 		next(ctx)
+	}
+}
+
+// MustSingleJWTRequirement prevents multiple JWT-naming security requirements.
+//
+// This is seen as a configuration error from the developer.
+func MustSingleJWTRequirement(_ *huma.OpenAPI, operation *huma.Operation) {
+	count := 0
+
+	for _, requirement := range operation.Security {
+		if _, ok := requirement[DefaultJWTSchemeKey]; ok {
+			count++
+		}
+	}
+
+	if count > 1 {
+		panic(fmt.Sprintf(
+			"operation %q declares %d JWT security requirements; at most one is supported",
+			operation.OperationID,
+			count,
+		))
+	}
+}
+
+// parseToken verifies the signature and claims of a bearer token.
+func parseToken(
+	ctx context.Context, cache *jwk.Cache, jwksURL, issuer, audience, token string,
+) (jwt.Token, error) {
+	keySet, err := cache.Lookup(ctx, jwksURL)
+	if err != nil {
+		return nil, err
+	}
+
+	// A lot of providers omit the signing algorithm, but it can be inferred from the key type.
+
+	return jwt.ParseString(token,
+		jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
+		jwt.WithValidate(true),
+		jwt.WithIssuer(issuer),
+		jwt.WithAudience(audience),
+	)
+}
+
+func RequireTokenForPaths(
+	cache *jwk.Cache, jwksURL, issuer, audience string, paths []string,
+) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			if !slices.Contains(paths, request.URL.Path) {
+				next.ServeHTTP(writer, request)
+
+				return
+			}
+
+			token, ok := bearerToken(request.Header.Get("Authorization"))
+			if !ok {
+				http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+
+				return
+			}
+
+			if _, err := parseToken(request.Context(), cache, jwksURL, issuer, audience, token); err != nil {
+				http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+
+				return
+			}
+
+			next.ServeHTTP(writer, request)
+		})
 	}
 }
 
