@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -10,37 +9,28 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/cors"
+	"github.com/sharktype/satchel/internal/http"
 )
 
 func MustNewAPI(
-	r chi.Router, humaConfig huma.Config, jwtConfig *auth.Config, jwtCache *jwk.Cache,
+	r chi.Router, humaConfig huma.Config, jwtCache *jwk.Cache, jwksURL, issuer, audience string,
 ) huma.API {
 	api := humachi.New(r, humaConfig)
 
-	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtConfig, jwtCache))
+	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtCache, jwksURL, issuer, audience))
 
 	return api
 }
 
-func MustNewRouter(config cors.Config) *chi.Mux {
-	router, err := newRouter(config)
-	if err != nil {
-		panic(fmt.Sprintf("error setting up routing: %v", err))
-	}
-
-	return router
-}
-
-func newRouter(config cors.Config) (*chi.Mux, error) {
-	corsHandler, err := cors.New(config)
-	if err != nil {
-		return nil, err
-	}
-
+func MustNewRouter(
+	allowedOrigins, allowedMethods, allowedHeaders, exposedHeaders []string,
+	allowCredentials bool,
+	maxAge int,
+) *chi.Mux {
 	router := chi.NewMux()
 
 	// Careful: we don't throttle; be careful and set up infra-level throttling/rate limiting.
+	// TODO: Can we throttle?
 
 	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
 	// attacker-controlled to bypass rate limits or other IP restrictions.
@@ -63,5 +53,5 @@ func newRouter(config cors.Config) (*chi.Mux, error) {
 		maxAge,
 	))
 
-	return router, nil
+	return router
 }

@@ -11,33 +11,32 @@ import (
 	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/health"
+	"github.com/sharktype/satchel/internal/utils"
 	"go.uber.org/zap"
 )
 
 func MustHandle(
 	ctx context.Context,
-	r *chi.Mux,
-	humaCfg huma.Config,
-	cfg *config.Config,
-	appClients *clients.Clients,
 	logger *zap.Logger,
+	r *chi.Mux,
+	appClients *clients.Clients,
+	title, version, jwksURL, issuer, audience string,
 ) {
-	if err := handle(ctx, r, humaCfg, cfg, appClients, logger); err != nil {
-		panic(fmt.Sprintf("error setting up routing: %v", err))
-	}
+	utils.Must(
+		handle(ctx, logger, r, appClients, title, version, jwksURL, issuer, audience),
+		"error setting up routing",
+	)
 }
 
 func handle(
 	ctx context.Context,
-	r *chi.Mux,
-	humaCfg huma.Config,
-	cfg *config.Config,
-	clients *clients.Clients,
 	logger *zap.Logger,
+	r *chi.Mux,
+	clients *clients.Clients,
+	title, version, jwksURL, issuer, audience string,
 ) error {
-	humaConfig := huma.DefaultConfig(cfg.API.Title, cfg.API.Version)
+	humaConfig := huma.DefaultConfig(title, version)
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		auth.DefaultJWTSchemeKey: {
 			Type:         "http",
@@ -46,11 +45,11 @@ func handle(
 		},
 	}
 
-	if cfg.Auth.JWKSURL == "" || cfg.Auth.JWKSURL == "<snip>" {
+	if jwksURL == "" || jwksURL == "<snip>" {
 		return fmt.Errorf("AUTH_JWKSURL is not set in the environment variables")
 	}
 
-	jwtCache, err := auth.NewJWKSet(ctx, cfg.Auth.JWKSURL)
+	jwtCache, err := auth.NewJWKSet(ctx, jwksURL)
 	if err != nil {
 		return err
 	}
@@ -60,7 +59,7 @@ func handle(
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, 1*time.Minute))
 
-		api := MustNewAPI(r, humaCfg, &cfg.Auth, jwtCache)
+		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetHealth",
@@ -74,47 +73,60 @@ func handle(
 
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, 1*time.Minute))
-		r.Use(auth.SubjectMiddleware)
 		if clients.DB != nil {
-			r.Use(auth.EnsureUserMiddleware(clients, logger))
+			r.Use(auth.EnsureUserMiddleware(logger, clients))
 		}
 
-		api := MustNewAPI(r, humaCfg, &cfg.Auth, jwtCache)
+		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience)
 
 		if clients.DB != nil {
-			huma.Register(api, huma.Operation{
-				OperationID: "GetDatabaseHealth",
-				Summary:     "Get Database Health",
+			huma.Register(
+				api,
+				huma.Operation{
+					OperationID: "GetDatabaseHealth",
+					Summary:     "Get Database Health",
+					Method:      http.MethodGet,
+					Path:        "/health/db",
+					Security: []map[string][]string{
+						{"JWT": {}},
+					},
+				},
+				withErrorLogging(
+					logger, "GetDatabaseHealth", health.GetDatabaseHealth(logger, clients),
+				),
+			)
+		}
+
+		huma.Register(
+			api,
+			huma.Operation{
+				OperationID: "GetAuthHealth",
+				Summary:     "Get Auth Health",
 				Method:      http.MethodGet,
-				Path:        "/health/db",
+				Path:        "/health/auth",
 				Security: []map[string][]string{
 					{"JWT": {}},
 				},
-			}, withErrorLogging(logger, "GetDatabaseHealth", health.GetDatabaseHealth(clients)))
-		}
-
-		huma.Register(api, huma.Operation{
-			OperationID: "GetAuthHealth",
-			Summary:     "Get Auth Health",
-			Method:      http.MethodGet,
-			Path:        "/health/auth",
-			Security: []map[string][]string{
-				{"JWT": {}},
 			},
-		}, withErrorLogging(logger, "GetAuthHealth", health.GetAuthHealth))
+			withErrorLogging(logger, "GetAuthHealth", health.GetAuthHealth),
+		)
 
 		// As this will cause a very loud error in o11y, it is strongly recommended to remove this
 		// as soon as you are satisfied that your error handling is working as expected.
 
-		huma.Register(api, huma.Operation{
-			OperationID: "GetErrorHealth",
-			Summary:     "Get Error Health",
-			Method:      http.MethodGet,
-			Path:        "/health/error",
-			Security: []map[string][]string{
-				{"JWT": {}},
+		huma.Register(
+			api,
+			huma.Operation{
+				OperationID: "GetErrorHealth",
+				Summary:     "Get Error Health",
+				Method:      http.MethodGet,
+				Path:        "/health/error",
+				Security: []map[string][]string{
+					{"JWT": {}},
+				},
 			},
-		}, withErrorLogging(logger, "GetErrorHealth", health.GetErrorHealth))
+			withErrorLogging(logger, "GetErrorHealth", health.GetErrorHealth),
+		)
 	})
 
 	return nil
@@ -125,6 +137,8 @@ func withErrorLogging[I, O any](
 	operation string,
 	callback func(context.Context, *I) (*O, error),
 ) func(context.Context, *I) (*O, error) {
+	// TODO: Report these to a bug tracker (Sentry or similar).
+
 	return func(ctx context.Context, input *I) (*O, error) {
 		result, err := callback(ctx, input)
 		if err != nil {
