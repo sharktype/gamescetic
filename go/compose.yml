@@ -1,6 +1,6 @@
 name: satchel
 services:
-  satchel-db:
+  db:
     image: postgres:18
     environment:
       POSTGRES_USER: satchel
