@@ -9,24 +9,29 @@ import (
 	"go.uber.org/zap"
 )
 
-func MustNewPool(ctx context.Context, logger *zap.Logger, driver, dsn string) *pgxpool.Pool {
+type (
+	Driver string
+	DSN    string
+)
+
+func MustNewPool(ctx context.Context, logger *zap.Logger, driver Driver, dsn DSN) *pgxpool.Pool {
 	pool, err := newPool(ctx, logger, driver, dsn)
+
 	utils.Must(err, "error creating database pool")
 
 	return pool
 }
 
-func newPool(ctx context.Context, cfg *Config, logger *zap.Logger) (*pgxpool.Pool, error) {
-	if cfg == nil || cfg.Driver == nil || cfg.DSN == nil {
-		return nil, errors.New("database connection is required")
+func newPool(
+	ctx context.Context, logger *zap.Logger, driver Driver, dsn DSN,
+) (*pgxpool.Pool, error) {
+	if driver != "postgres" {
+		return nil, fmt.Errorf("unsupported database driver: %s", driver)
 	}
 
-	if *cfg.Driver != "postgres" {
-		return nil, fmt.Errorf("unsupported database driver: %s", *cfg.Driver)
-	}
+	logger.Debug("connecting to database and testing connection...")
 
-	logger.Debug("connecting to postgres database and testing connection...")
-	pool, err := pgxpool.New(ctx, *cfg.DSN)
+	pool, err := pgxpool.New(ctx, string(dsn))
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +40,7 @@ func newPool(ctx context.Context, cfg *Config, logger *zap.Logger) (*pgxpool.Poo
 		return nil, err
 	}
 
-	logger.Info("postgres database connection successful")
+	logger.Info("database connection successful")
 
 	return pool, nil
 }
