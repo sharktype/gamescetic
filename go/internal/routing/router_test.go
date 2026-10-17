@@ -8,17 +8,17 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
+	"github.com/sharktype/satchel/internal/auth/authtest"
 )
 
 func TestNewAPI(t *testing.T) {
-	idp := test_auth.NewIDP(t)
+	idp := authtest.NewIDP(t)
 
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, idp, provisionedClients())
-		handler := test_auth.RegisterProbe(public, nil)
+		router, public, _ := newTestAPI(t, idp, provisionedUsers())
+		handler := authtest.RegisterProbe(public, nil)
 
-		if code := get(router, test_auth.ProbePath, "").Code; code != http.StatusOK {
+		if code := get(router, authtest.ProbePath, "").Code; code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
@@ -28,7 +28,7 @@ func TestNewAPI(t *testing.T) {
 	})
 
 	t.Run("the public group refuses an operation declaring a JWT requirement", func(t *testing.T) {
-		_, public, _ := newTestAPI(t, idp, provisionedClients())
+		_, public, _ := newTestAPI(t, idp, provisionedUsers())
 
 		defer func() {
 			if recover() == nil {
@@ -36,14 +36,14 @@ func TestNewAPI(t *testing.T) {
 			}
 		}()
 
-		test_auth.RegisterProbe(public, test_auth.RequireJWT())
+		authtest.RegisterProbe(public, authtest.RequireJWT())
 	})
 
 	t.Run("the secured group keeps scopes and documents one JWT requirement", func(t *testing.T) {
-		router, _, secured := newTestAPI(t, idp, provisionedClients())
-		handler := test_auth.RegisterProbe(secured, test_auth.RequireJWT("posts:read"))
+		router, _, secured := newTestAPI(t, idp, provisionedUsers())
+		handler := authtest.RegisterProbe(secured, authtest.RequireJWT("posts:read"))
 
-		code := get(router, test_auth.ProbePath, "Bearer "+idp.Token(t, "sub-1")).Code
+		code := get(router, authtest.ProbePath, "Bearer "+idp.Token(t, "sub-1")).Code
 		if code != http.StatusForbidden {
 			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
 		}
@@ -52,7 +52,7 @@ func TestNewAPI(t *testing.T) {
 			t.Fatal("the handler ran")
 		}
 
-		security := secured.OpenAPI().Paths[test_auth.ProbePath].Get.Security
+		security := secured.OpenAPI().Paths[authtest.ProbePath].Get.Security
 		if len(security) != 1 {
 			t.Fatalf("got %d documented security requirements, want 1", len(security))
 		}
@@ -73,11 +73,11 @@ func TestNewAPI(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			router, _, secured := newTestAPI(t, idp, provisionedClients())
-			handler := test_auth.RegisterProbe(secured, nil)
+			router, _, secured := newTestAPI(t, idp, provisionedUsers())
+			handler := authtest.RegisterProbe(secured, nil)
 
 			if code := get(
-				router, test_auth.ProbePath, test.authorization,
+				router, authtest.ProbePath, test.authorization,
 			).Code; code != http.StatusUnauthorized {
 				t.Fatalf("got %d, want %d", code, http.StatusUnauthorized)
 			}
@@ -157,7 +157,7 @@ type thingInput struct {
 
 func TestRateLimit(t *testing.T) {
 	t.Run("limits by operation rather than URL path", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, test_auth.NewIDP(t), provisionedClients())
+		router, public, _ := newTestAPI(t, authtest.NewIDP(t), provisionedUsers())
 
 		huma.Register(public, huma.Operation{
 			OperationID: "GetThing",
@@ -180,9 +180,9 @@ func TestRateLimit(t *testing.T) {
 	})
 
 	t.Run("hitting the limit on one operation does not block another", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, test_auth.NewIDP(t), provisionedClients())
+		router, public, _ := newTestAPI(t, authtest.NewIDP(t), provisionedUsers())
 
-		test_auth.RegisterProbe(public, nil)
+		authtest.RegisterProbe(public, nil)
 
 		huma.Register(public, huma.Operation{
 			OperationID: "GetThing",
@@ -193,7 +193,7 @@ func TestRateLimit(t *testing.T) {
 		})
 
 		for range publicRateLimit {
-			get(router, test_auth.ProbePath, "")
+			get(router, authtest.ProbePath, "")
 		}
 
 		if code := get(router, "/things/a", "").Code; code == http.StatusTooManyRequests {

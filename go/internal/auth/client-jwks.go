@@ -9,8 +9,6 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 )
 
-const DefaultJWTSchemeKey = "JWT"
-
 func NewJWKSet(ctx context.Context, jwkUrl string) (*jwk.Cache, error) {
 	httpClient := httprc.NewClient()
 

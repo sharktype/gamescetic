@@ -21,7 +21,7 @@ func Handle(
 	authConfig auth.Config,
 ) error {
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		auth.DefaultJWTSchemeKey: {
+		auth.JWTSchemeKey: {
 			Type:         "http",
 			Scheme:       "bearer",
 			BearerFormat: "JWT",

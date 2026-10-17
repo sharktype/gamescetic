@@ -18,6 +18,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const JWTSchemeKey = "JWT"
+
 type contextKey int
 
 const userKey contextKey = iota
@@ -75,7 +77,7 @@ func NewJWTAuthMiddleware(
 
 func jwtScopes(operation *huma.Operation) ([]string, bool) {
 	for _, requirement := range operation.Security {
-		if scopes, ok := requirement[DefaultJWTSchemeKey]; ok {
+		if scopes, ok := requirement[JWTSchemeKey]; ok {
 			return scopes, true
 		}
 	}
@@ -109,7 +111,7 @@ func MustSingleJWTRequirement(_ *huma.OpenAPI, operation *huma.Operation) {
 	count := 0
 
 	for _, requirement := range operation.Security {
-		if _, ok := requirement[DefaultJWTSchemeKey]; ok {
+		if _, ok := requirement[JWTSchemeKey]; ok {
 			count++
 		}
 	}

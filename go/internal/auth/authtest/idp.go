@@ -1,4 +1,4 @@
-package test_auth
+package authtest
 
 import (
 	"crypto/ecdsa"

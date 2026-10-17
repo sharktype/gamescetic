@@ -8,7 +8,7 @@ import (
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
-	test_db "github.com/sharktype/satchel/internal/db/test-db"
+	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
 func TestExecTx(t *testing.T) {
@@ -20,7 +20,7 @@ func TestExecTx(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	database := test_db.New(t, cfg.Clients.DB.DSN)
+	database := dbtest.New(t, cfg.Clients.DB.DSN)
 
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)

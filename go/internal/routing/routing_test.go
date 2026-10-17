@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"testing"
 
-	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
+	"github.com/sharktype/satchel/internal/auth/authtest"
 )
 
 func TestHandle(t *testing.T) {
 	t.Run("the specification documents every operation", func(t *testing.T) {
-		response := get(newHandledRouter(t, test_auth.NewIDP(t)), "/openapi.json", "")
+		response := get(newHandledRouter(t, authtest.NewIDP(t)), "/openapi.json", "")
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -32,7 +32,7 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("auth health answers with the viewer", func(t *testing.T) {
-		idp := test_auth.NewIDP(t)
+		idp := authtest.NewIDP(t)
 
 		response := get(newHandledRouter(t, idp), "/health/auth", "Bearer "+idp.Token(t, "sub-1"))
 
@@ -54,7 +54,7 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		idp := test_auth.NewIDP(t)
+		idp := authtest.NewIDP(t)
 
 		router := newHandledRouter(t, idp)
 
@@ -72,7 +72,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		idp := test_auth.NewIDP(t)
+		idp := authtest.NewIDP(t)
 		router := newHandledRouter(t, idp)
 
 		for i := range publicRateLimit {
@@ -99,7 +99,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router := newHandledRouter(t, test_auth.NewIDP(t))
+		router := newHandledRouter(t, authtest.NewIDP(t))
 
 		for i := range securedRateLimit {
 			if code := get(

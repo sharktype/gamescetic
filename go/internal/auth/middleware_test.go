@@ -10,9 +10,9 @@ import (
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
-	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
+	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db"
-	test_db "github.com/sharktype/satchel/internal/db/test-db"
+	"github.com/sharktype/satchel/internal/db/dbtest"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +23,7 @@ var provisioned = generated.User{
 	Email: "ada-lovelace@example.com",
 }
 
-func newTestAPI(t *testing.T, idp *test_auth.IDP, users db.Client) humatest.TestAPI {
+func newTestAPI(t *testing.T, idp *authtest.IDP, users db.Client) humatest.TestAPI {
 	t.Helper()
 
 	_, api := humatest.New(t)
@@ -33,18 +33,18 @@ func newTestAPI(t *testing.T, idp *test_auth.IDP, users db.Client) humatest.Test
 }
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
-	idp := test_auth.NewIDP(t)
+	idp := authtest.NewIDP(t)
 
 	t.Run("an unsecured operation never resolves a viewer", func(t *testing.T) {
-		api := newTestAPI(t, idp, &test_db.Stub{User: provisioned})
-		probe := test_auth.RegisterProbe(api, nil)
+		api := newTestAPI(t, idp, &dbtest.Stub{User: provisioned})
+		probe := authtest.RegisterProbe(api, nil)
 
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
 		claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"sub-1"}`))
 
 		forged := header + "." + claims + ".no-signature"
 
-		code := api.Get(test_auth.ProbePath, "Authorization: Bearer "+forged).Code
+		code := api.Get(authtest.ProbePath, "Authorization: Bearer "+forged).Code
 		if code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
@@ -55,12 +55,12 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	})
 
 	t.Run("a verified token resolves the viewer by its subject", func(t *testing.T) {
-		api := newTestAPI(t, idp, &test_db.Stub{User: provisioned})
-		probe := test_auth.RegisterProbe(api, test_auth.RequireJWT())
+		api := newTestAPI(t, idp, &dbtest.Stub{User: provisioned})
+		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 		token := idp.Token(t, "sub-1")
 
-		code := api.Get(test_auth.ProbePath, "Authorization: Bearer "+token).Code
+		code := api.Get(authtest.ProbePath, "Authorization: Bearer "+token).Code
 		if code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
@@ -78,25 +78,25 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	}{
 		{
 			name:           "a token signed by another key is rejected",
-			users:          &test_db.Stub{User: provisioned},
-			token:          test_auth.NewIDP(t).Token(t, "sub-1"),
+			users:          &dbtest.Stub{User: provisioned},
+			token:          authtest.NewIDP(t).Token(t, "sub-1"),
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "a token without a subject is rejected",
-			users:          &test_db.Stub{User: provisioned},
+			users:          &dbtest.Stub{User: provisioned},
 			token:          idp.Token(t, ""),
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "a subject that is not provisioned is forbidden",
-			users:          &test_db.Stub{User: provisioned},
+			users:          &dbtest.Stub{User: provisioned},
 			token:          idp.Token(t, "sub-2"),
 			expectedStatus: http.StatusForbidden,
 		},
 		{
 			name:           "a failing user lookup is an internal error",
-			users:          &test_db.Stub{UserErr: errors.New("arbitrary error")},
+			users:          &dbtest.Stub{UserErr: errors.New("arbitrary error")},
 			token:          idp.Token(t, "sub-1"),
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -105,9 +105,9 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
 			api := newTestAPI(t, idp, test.users)
-			probe := test_auth.RegisterProbe(api, test_auth.RequireJWT())
+			probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
-			code := api.Get(test_auth.ProbePath, "Authorization: Bearer "+test.token).Code
+			code := api.Get(authtest.ProbePath, "Authorization: Bearer "+test.token).Code
 			if code != test.expectedStatus {
 				t.Fatalf("got %d, want %d", code, test.expectedStatus)
 			}
@@ -162,12 +162,12 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				api := newTestAPI(t, idp, &test_db.Stub{User: provisioned})
-				probe := test_auth.RegisterProbe(api, test_auth.RequireJWT(test.declared...))
+				api := newTestAPI(t, idp, &dbtest.Stub{User: provisioned})
+				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
 				token := idp.TokenWithScopes(t, "sub-1", test.granted)
 
-				code := api.Get(test_auth.ProbePath, "Authorization: Bearer "+token).Code
+				code := api.Get(authtest.ProbePath, "Authorization: Bearer "+token).Code
 				if code != test.expectedStatus {
 					t.Fatalf("got %d, want %d", code, test.expectedStatus)
 				}
@@ -181,7 +181,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 }
 
 func TestMustSingleJWTRequirement(t *testing.T) {
-	jwtRequirement := map[string][]string{auth.DefaultJWTSchemeKey: {}}
+	jwtRequirement := map[string][]string{auth.JWTSchemeKey: {}}
 
 	tests := []struct {
 		name        string
@@ -223,7 +223,7 @@ func TestMustSingleJWTRequirement(t *testing.T) {
 }
 
 func TestBearerToken(t *testing.T) {
-	idp := test_auth.NewIDP(t)
+	idp := authtest.NewIDP(t)
 	token := idp.Token(t, "sub-1")
 
 	tests := []struct {
@@ -274,15 +274,15 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api := newTestAPI(t, idp, &test_db.Stub{User: provisioned})
-			test_auth.RegisterProbe(api, test_auth.RequireJWT())
+			api := newTestAPI(t, idp, &dbtest.Stub{User: provisioned})
+			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			var headers []any
 			if test.authorization != "" {
 				headers = append(headers, "Authorization: "+test.authorization)
 			}
 
-			if code := api.Get(test_auth.ProbePath, headers...).Code; code != test.expectedStatus {
+			if code := api.Get(authtest.ProbePath, headers...).Code; code != test.expectedStatus {
 				t.Fatalf("got %d, want %d", code, test.expectedStatus)
 			}
 		})
