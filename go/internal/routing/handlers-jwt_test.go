@@ -1,155 +1,78 @@
 package routing
 
 import (
-	"context"
 	"encoding/base64"
 	"net/http"
-	"net/http/httptest"
 	"testing"
-
-	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth"
 )
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
+	idp := newTestIDP(t)
+
 	t.Run("an unsecured operation never sets a subject", func(t *testing.T) {
-		idp := newTestIDP(t)
-
-		router, api := newProvisionedAPI(t, idp)
-
-		var subject string
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Open",
-			Method:      http.MethodGet,
-			Path:        "/open",
-		}, func(ctx context.Context, _ *stubInput) (*stubOutput, error) {
-			subject, _ = auth.SubjectFromContext(ctx)
-
-			return &stubOutput{}, nil
-		})
+		router, api := newTestAPI(t, idp, provisionedClients())
+		handler := registerProbe(api, nil)
 
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
 		claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"attacker"}`))
 
-		request := httptest.NewRequest(http.MethodGet, "/open", nil)
-		request.Header.Set("Authorization", "Bearer "+header+"."+claims+".no-signature")
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusOK {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
+		code := get(router, probePath, "Bearer "+header+"."+claims+".no-signature").Code
+		if code != http.StatusOK {
+			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if subject != "" {
-			t.Fatalf("got subject %q, want none", subject)
+		if handler.subject != "" {
+			t.Fatalf("got subject %q, want none", handler.subject)
 		}
 	})
 
 	t.Run("a verified token sets the subject", func(t *testing.T) {
-		idp := newTestIDP(t)
+		router, api := newTestAPI(t, idp, provisionedClients())
+		handler := registerProbe(api, requireJWT())
 
-		router, api := newProvisionedAPI(t, idp)
-
-		var subject string
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Secured",
-			Method:      http.MethodGet,
-			Path:        "/secured",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, func(ctx context.Context, _ *stubInput) (*stubOutput, error) {
-			subject, _ = auth.SubjectFromContext(ctx)
-
-			return &stubOutput{}, nil
-		})
-
-		request := httptest.NewRequest(http.MethodGet, "/secured", nil)
-		request.Header.Set("Authorization", "Bearer "+idp.token(t, "user-1"))
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusOK {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
+		if code := get(
+			router, probePath, "Bearer "+idp.token(t, "user-1"),
+		).Code; code != http.StatusOK {
+			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if subject != "user-1" {
-			t.Fatalf("got subject %q, want %q", subject, "user-1")
+		if handler.subject != "user-1" {
+			t.Fatalf("got subject %q, want %q", handler.subject, "user-1")
 		}
 	})
 
-	t.Run("a token signed by another key is rejected", func(t *testing.T) {
-		idp := newTestIDP(t)
-		otherIDP := newTestIDP(t)
+	rejections := []struct {
+		name  string
+		token string
+	}{
+		{
+			name:  "a token signed by another key is rejected",
+			token: newTestIDP(t).token(t, "attacker"),
+		},
+		{
+			name:  "a token without a subject is rejected",
+			token: idp.token(t, ""),
+		},
+	}
 
-		router, api := newProvisionedAPI(t, idp)
+	for _, test := range rejections {
+		t.Run(test.name, func(t *testing.T) {
+			router, api := newTestAPI(t, idp, provisionedClients())
+			handler := registerProbe(api, requireJWT())
 
-		handlerRan := false
+			if code := get(
+				router, probePath, "Bearer "+test.token,
+			).Code; code != http.StatusUnauthorized {
+				t.Fatalf("got %d, want %d", code, http.StatusUnauthorized)
+			}
 
-		huma.Register(api, huma.Operation{
-			OperationID: "Secured",
-			Method:      http.MethodGet,
-			Path:        "/secured",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, func(context.Context, *stubInput) (*stubOutput, error) {
-			handlerRan = true
-
-			return &stubOutput{}, nil
+			if handler.ran {
+				t.Fatal("the handler ran")
+			}
 		})
-
-		request := httptest.NewRequest(http.MethodGet, "/secured", nil)
-		request.Header.Set("Authorization", "Bearer "+otherIDP.token(t, "attacker"))
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusUnauthorized)
-		}
-
-		if handlerRan {
-			t.Fatal("the handler ran")
-		}
-	})
-
-	t.Run("a token without a subject is rejected", func(t *testing.T) {
-		idp := newTestIDP(t)
-
-		router, api := newProvisionedAPI(t, idp)
-
-		handlerRan := false
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Secured",
-			Method:      http.MethodGet,
-			Path:        "/secured",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, func(context.Context, *stubInput) (*stubOutput, error) {
-			handlerRan = true
-
-			return &stubOutput{}, nil
-		})
-
-		request := httptest.NewRequest(http.MethodGet, "/secured", nil)
-		request.Header.Set("Authorization", "Bearer "+idp.token(t, ""))
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusUnauthorized)
-		}
-
-		if handlerRan {
-			t.Fatal("the handler ran")
-		}
-	})
+	}
 
 	t.Run("scopes", func(t *testing.T) {
-		idp := newTestIDP(t)
-
 		// "posts" is just an example here.
 
 		tests := []struct {
@@ -194,32 +117,18 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				router, api := newTestAPI(t, idp, provisionedClients())
+				handler := registerProbe(api, requireJWT(test.declared...))
 
-				handlerRan := false
+				token := idp.tokenWithScopes(t, "sub-1", test.granted)
 
-				huma.Register(api, huma.Operation{
-					OperationID: "Secured",
-					Method:      http.MethodGet,
-					Path:        "/secured",
-					Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: test.declared}},
-				}, func(context.Context, *stubInput) (*stubOutput, error) {
-					handlerRan = true
-
-					return &stubOutput{}, nil
-				})
-
-				request := httptest.NewRequest(http.MethodGet, "/secured", nil)
-				request.Header.Set("Authorization", "Bearer "+idp.tokenWithScopes(t, "sub-1", test.granted))
-
-				response := httptest.NewRecorder()
-				router.ServeHTTP(response, request)
-
-				if response.Code != test.expectedStatus {
-					t.Fatalf("got %d, want %d", response.Code, test.expectedStatus)
+				if code := get(
+					router, probePath, "Bearer "+token,
+				).Code; code != test.expectedStatus {
+					t.Fatalf("got %d, want %d", code, test.expectedStatus)
 				}
 
-				if handlerRan != test.expectedIsRun {
-					t.Fatalf("handler ran: got %t, want %t", handlerRan, test.expectedIsRun)
+				if handler.ran != test.expectedIsRun {
+					t.Fatalf("handler ran: got %t, want %t", handler.ran, test.expectedIsRun)
 				}
 			})
 		}

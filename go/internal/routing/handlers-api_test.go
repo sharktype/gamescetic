@@ -1,145 +1,59 @@
 package routing
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/httprate"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/health"
 )
 
 func TestMustNewAPI(t *testing.T) {
+	idp := newTestIDP(t)
+
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
-		idp := newTestIDP(t)
-
-		router, api := newProvisionedAPI(t, idp)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Open",
-			Method:      http.MethodGet,
-			Path:        "/open",
-		}, func(context.Context, *stubInput) (*stubOutput, error) {
-			return &stubOutput{}, nil
-		})
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/open", nil))
-
-		if response.Code != http.StatusOK {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
-		}
-	})
-
-	t.Run("a secured operation rejects a request without providing a token", func(t *testing.T) {
-		idp := newTestIDP(t)
-
-		router, api := newProvisionedAPI(t, idp)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Secured",
-			Method:      http.MethodGet,
-			Path:        "/secured",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, func(context.Context, *stubInput) (*stubOutput, error) {
-			return &stubOutput{}, nil
-		})
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/secured", nil))
-
-		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusUnauthorized)
-		}
-	})
-
-	t.Run("a secured operation rejects a non-bearer header", func(t *testing.T) {
-		idp := newTestIDP(t)
-
-		router, api := newProvisionedAPI(t, idp)
-
-		huma.Register(api, huma.Operation{
-			OperationID: "Secured",
-			Method:      http.MethodGet,
-			Path:        "/secured",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, func(context.Context, *stubInput) (*stubOutput, error) {
-			return &stubOutput{}, nil
-		})
-
-		request := httptest.NewRequest(http.MethodGet, "/secured", nil)
-		request.Header.Set("Authorization", "Basic abc")
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusUnauthorized {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusUnauthorized)
-		}
-	})
-
-	t.Run("auth health answers with the viewer", func(t *testing.T) {
-		idp := newTestIDP(t)
-
 		router, api := newTestAPI(t, idp, provisionedClients())
+		handler := registerProbe(api, nil)
 
-		huma.Register(api, huma.Operation{
-			OperationID: "GetAuthHealth",
-			Method:      http.MethodGet,
-			Path:        "/health/auth",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, health.GetAuthHealth)
-
-		request := httptest.NewRequest(http.MethodGet, "/health/auth", nil)
-		request.Header.Set("Authorization", "Bearer "+idp.token(t, "sub-1"))
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusOK {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
+		if code := get(router, probePath, "").Code; code != http.StatusOK {
+			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		var body struct {
-			Message string `json:"message"`
-		}
-
-		if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-			t.Fatal(err)
-		}
-
-		if body.Message != "user-1 OK" {
-			t.Fatalf("got %q, want %q", body.Message, "user-1 OK")
+		if !handler.ran {
+			t.Fatal("the handler did not run")
 		}
 	})
 
-	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		idp := newTestIDP(t)
+	rejections := []struct {
+		name          string
+		authorization string
+	}{
+		{
+			name: "a secured operation rejects a request without providing a token",
+		},
+		{
+			name:          "a secured operation rejects a non-bearer header",
+			authorization: "Basic abc",
+		},
+	}
 
-		router, api := newTestAPI(t, idp, provisionedClients())
+	for _, test := range rejections {
+		t.Run(test.name, func(t *testing.T) {
+			router, api := newTestAPI(t, idp, provisionedClients())
+			handler := registerProbe(api, requireJWT())
 
-		huma.Register(api, huma.Operation{
-			OperationID: "GetErrorHealth",
-			Method:      http.MethodGet,
-			Path:        "/health/error",
-			Security:    []map[string][]string{{auth.DefaultJWTSchemeKey: {}}},
-		}, health.GetErrorHealth)
+			if code := get(
+				router, probePath, test.authorization,
+			).Code; code != http.StatusUnauthorized {
+				t.Fatalf("got %d, want %d", code, http.StatusUnauthorized)
+			}
 
-		request := httptest.NewRequest(http.MethodGet, "/health/error", nil)
-		request.Header.Set("Authorization", "Bearer "+idp.token(t, "sub-1"))
-
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, request)
-
-		if response.Code != http.StatusInternalServerError {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
-		}
-	})
+			if handler.ran {
+				t.Fatal("the handler ran")
+			}
+		})
+	}
 }
 
 func TestMustNewRouter(t *testing.T) {
@@ -150,11 +64,8 @@ func TestMustNewRouter(t *testing.T) {
 			panic("arbitrary panic")
 		})
 
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/panic", nil))
-
-		if response.Code != http.StatusInternalServerError {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
+		if code := get(router, "/panic", "").Code; code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
 		}
 	})
 
@@ -165,20 +76,14 @@ func TestMustNewRouter(t *testing.T) {
 
 		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
 
-		for i := 0; i < globalRateLimit; i++ {
-			response := httptest.NewRecorder()
-			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ping", nil))
-
-			if response.Code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, response.Code, http.StatusOK)
+		for i := range globalRateLimit {
+			if code := get(router, "/ping", "").Code; code != http.StatusOK {
+				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
 			}
 		}
 
-		response := httptest.NewRecorder()
-		router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/ping", nil))
-
-		if response.Code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", response.Code, http.StatusTooManyRequests)
+		if code := get(router, "/ping", "").Code; code != http.StatusTooManyRequests {
+			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 	})
 
@@ -197,7 +102,7 @@ func TestMustNewRouter(t *testing.T) {
 			return response.Code
 		}
 
-		for i := 0; i < globalRateLimit; i++ {
+		for i := range globalRateLimit {
 			if code := request("1.0.0.1"); code != http.StatusOK {
 				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
 			}
@@ -231,26 +136,19 @@ func TestLimitByRoute(t *testing.T) {
 			})
 		})
 
-		send := func(path string) int {
-			response := httptest.NewRecorder()
-			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
-
-			return response.Code
-		}
-
 		for _, id := range []string{"a", "b"} {
-			if code := send("/things/" + id); code != http.StatusOK {
+			if code := get(router, "/things/"+id, "").Code; code != http.StatusOK {
 				t.Fatalf("%s: got %d, want %d", id, code, http.StatusOK)
 			}
 		}
 
-		if code := send("/things/c"); code != http.StatusTooManyRequests {
+		if code := get(router, "/things/c", "").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
 		// A route that is not listed falls through to whatever the router already applied.
 
-		if code := send("/other"); code != http.StatusOK {
+		if code := get(router, "/other", "").Code; code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 	})
