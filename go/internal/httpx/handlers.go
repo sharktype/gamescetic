@@ -1,4 +1,4 @@
-package http
+package httpx
 
 import (
 	"errors"
@@ -9,24 +9,23 @@ import (
 	"github.com/sharktype/satchel/internal/utils"
 )
 
-func MustNewCORSHandler(
-	allowedOrigins, allowedMethods, allowedHeaders, exposedHeaders []string,
-	allowCredentials bool,
-	maxAge int,
-) func(next nethttp.Handler) nethttp.Handler {
-	utils.Must(validate(allowedOrigins), "invalid CORS configuration")
+// Middleware matches chi's middleware signature.
+type Middleware = func(next nethttp.Handler) nethttp.Handler
+
+func MustNewCORSHandler(cfg CORSConfig) Middleware {
+	utils.Must(validate(cfg.AllowedOrigins), "invalid CORS configuration")
 
 	return cors.Handler(cors.Options{
-		AllowedOrigins:   allowedOrigins,
-		AllowedMethods:   allowedMethods,
-		AllowedHeaders:   allowedHeaders,
-		ExposedHeaders:   exposedHeaders,
-		AllowCredentials: allowCredentials,
-		MaxAge:           maxAge,
+		AllowedOrigins:   cfg.AllowedOrigins,
+		AllowedMethods:   cfg.AllowedMethods,
+		AllowedHeaders:   cfg.AllowedHeaders,
+		ExposedHeaders:   cfg.ExposedHeaders,
+		AllowCredentials: cfg.AllowCredentials,
+		MaxAge:           cfg.MaxAge,
 	})
 }
 
-func SecurityHeaders() func(next nethttp.Handler) nethttp.Handler {
+func SecurityHeaders() Middleware {
 	// Note this API will only ever serve plain HTTP behind a proxy or CDN, so HSTS belongs at that
 	// hop, not here (e.g., Cloudflare's security settings).
 

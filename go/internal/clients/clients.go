@@ -11,8 +11,8 @@ type Clients struct {
 	DB db.Client
 }
 
-func MustNew(ctx context.Context, logger *zap.Logger, driver, dsn string) *Clients {
-	return &Clients{DB: db.MustNew(db.MustNewPool(ctx, logger, db.Driver(driver), db.DSN(dsn)))}
+func MustNew(ctx context.Context, logger *zap.Logger, cfg db.Config) *Clients {
+	return &Clients{DB: db.MustNew(db.MustNewPool(ctx, logger, cfg))}
 }
 
 func NewStubs() *Clients {

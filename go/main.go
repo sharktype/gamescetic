@@ -6,9 +6,13 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humacli"
+	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/config"
+	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
 )
@@ -32,28 +36,32 @@ func main() {
 	logger := logger.MustNew()
 	cfg := config.MustNew(logger)
 
-	appClients := clients.MustNew(ctx, logger, cfg.Clients.DB.Driver, cfg.Clients.DB.DSN)
+	appClients := clients.MustNew(ctx, logger, db.Config{
+		Driver: cfg.Clients.DB.Driver,
+		DSN:    cfg.Clients.DB.DSN,
+	})
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		router := routing.MustNewRouter(
-			cfg.CORS.AllowedOrigins,
-			cfg.CORS.AllowedMethods,
-			cfg.CORS.AllowedHeaders,
-			cfg.CORS.ExposedHeaders,
-			cfg.CORS.AllowCredentials,
-			cfg.CORS.MaxAge,
-		)
+		router := routing.MustNewRouter(httpx.MustNewCORSHandler(httpx.CORSConfig{
+			AllowedOrigins:   cfg.CORS.AllowedOrigins,
+			AllowedMethods:   cfg.CORS.AllowedMethods,
+			AllowedHeaders:   cfg.CORS.AllowedHeaders,
+			ExposedHeaders:   cfg.CORS.ExposedHeaders,
+			AllowCredentials: cfg.CORS.AllowCredentials,
+			MaxAge:           cfg.CORS.MaxAge,
+		}))
 
 		routing.MustHandle(
 			ctx,
 			logger,
 			router,
 			appClients,
-			cfg.API.Title,
-			cfg.API.Version,
-			cfg.Auth.JWKSURL,
-			cfg.Auth.Issuer,
-			cfg.Auth.Audience,
+			huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
+			auth.Config{
+				JWKSURL:  cfg.Auth.JWKSURL,
+				Issuer:   cfg.Auth.Issuer,
+				Audience: cfg.Auth.Audience,
+			},
 		)
 
 		server := &http.Server{

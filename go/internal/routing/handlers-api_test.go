@@ -9,37 +9,17 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/health"
-	"go.uber.org/zap"
 )
-
-type stubInput struct{}
-
-type stubOutput struct {
-	Body struct {
-		Message string `json:"message"`
-	}
-}
 
 func TestMustNewAPI(t *testing.T) {
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Open",
@@ -60,17 +40,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("a secured operation rejects a request without providing a token", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Secured",
@@ -92,17 +62,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("a secured operation rejects a non-bearer header", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Secured",
@@ -132,17 +92,7 @@ func TestMustNewAPI(t *testing.T) {
 			"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com", nil, time.Now(), nil,
 		}
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			&clients.Clients{DB: client},
-			zap.NewNop(),
-		)
+		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetAuthHealth",
@@ -177,7 +127,7 @@ func TestMustNewAPI(t *testing.T) {
 
 func TestMustNewRouter(t *testing.T) {
 	t.Run("panics are recovered", func(t *testing.T) {
-		router := MustNewRouter([]string{"http://example.com"}, nil, nil, nil, false, 0)
+		router := testRouter(t)
 
 		router.Get("/panic", func(http.ResponseWriter, *http.Request) {
 			panic("arbitrary panic")
@@ -192,7 +142,7 @@ func TestMustNewRouter(t *testing.T) {
 	})
 
 	t.Run("the global limiter covers ping", func(t *testing.T) {
-		router := MustNewRouter([]string{"http://example.com"}, nil, nil, nil, false, 0)
+		router := testRouter(t)
 
 		// chi only runs its middleware once the mux has a route.
 

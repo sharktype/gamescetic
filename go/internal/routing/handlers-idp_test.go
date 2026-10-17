@@ -77,6 +77,14 @@ func newTestIDP(t *testing.T) *testIDP {
 	}
 }
 
+func (i *testIDP) config() auth.Config {
+	return auth.Config{
+		JWKSURL:  i.JWKSURL,
+		Issuer:   i.Issuer,
+		Audience: i.Audience,
+	}
+}
+
 func (i *testIDP) token(t *testing.T, sub string) string {
 	t.Helper()
 

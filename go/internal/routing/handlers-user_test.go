@@ -8,12 +8,10 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
 )
 
 func TestRequireUserMiddleware(t *testing.T) {
@@ -23,17 +21,7 @@ func TestRequireUserMiddleware(t *testing.T) {
 		client := db.NewStub()
 		client.QueryRowErr = pgx.ErrNoRows
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			&clients.Clients{DB: client},
-			zap.NewNop(),
-		)
+		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
 
 		handlerRan := false
 
@@ -77,17 +65,7 @@ func TestRequireUserMiddleware(t *testing.T) {
 			nil,
 		}
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			&clients.Clients{DB: client},
-			zap.NewNop(),
-		)
+		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
 
 		var viewerID string
 		var viewerEmail string

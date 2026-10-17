@@ -11,7 +11,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/http"
+	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
 
@@ -27,29 +27,25 @@ func MustNewAPI(
 	r chi.Router,
 	humaConfig huma.Config,
 	jwtCache *jwk.Cache,
-	jwksURL, issuer, audience string,
+	authConfig auth.Config,
 	clients *clients.Clients,
 	logger *zap.Logger,
 ) huma.API {
 	api := humachi.New(r, humaConfig)
 
-	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtCache, jwksURL, issuer, audience))
+	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtCache, authConfig))
 	api.UseMiddleware(auth.RequireUserMiddleware(api, auth.NewManager(clients.DB), logger))
 
 	return api
 }
 
-func MustNewRouter(
-	allowedOrigins, allowedMethods, allowedHeaders, exposedHeaders []string,
-	allowCredentials bool,
-	maxAge int,
-) *chi.Mux {
+func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router := chi.NewMux()
 
 	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
 	// attacker-controlled to bypass rate limits or other IP restrictions.
 
-	router.Use(http.SecurityHeaders())
+	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
@@ -58,14 +54,7 @@ func MustNewRouter(
 	router.Use(middleware.GetHead)
 	router.Use(middleware.Timeout(requestTimeout))
 	router.Use(middleware.Compress(compressionLevel))
-	router.Use(http.MustNewCORSHandler(
-		allowedOrigins,
-		allowedMethods,
-		allowedHeaders,
-		exposedHeaders,
-		allowCredentials,
-		maxAge,
-	))
+	router.Use(corsMiddleware)
 
 	// Counts per replica so remember to keep volumetric throttling at the edge too.
 

@@ -20,10 +20,11 @@ func MustHandle(
 	logger *zap.Logger,
 	r *chi.Mux,
 	appClients *clients.Clients,
-	title, version, jwksURL, issuer, audience string,
+	humaConfig huma.Config,
+	authConfig auth.Config,
 ) {
 	utils.Must(
-		handle(ctx, logger, r, appClients, title, version, jwksURL, issuer, audience),
+		handle(ctx, logger, r, appClients, humaConfig, authConfig),
 		"error setting up routing",
 	)
 }
@@ -33,9 +34,9 @@ func handle(
 	logger *zap.Logger,
 	r *chi.Mux,
 	clients *clients.Clients,
-	title, version, jwksURL, issuer, audience string,
+	humaConfig huma.Config,
+	authConfig auth.Config,
 ) error {
-	humaConfig := huma.DefaultConfig(title, version)
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
 		auth.DefaultJWTSchemeKey: {
 			Type:         "http",
@@ -46,11 +47,11 @@ func handle(
 
 	humaConfig.OnAddOperation = append(humaConfig.OnAddOperation, auth.MustSingleJWTRequirement)
 
-	if jwksURL == "" || jwksURL == "<snip>" {
+	if authConfig.JWKSURL == "" || authConfig.JWKSURL == "<snip>" {
 		return fmt.Errorf("AUTH_JWKSURL is not set in the environment variables")
 	}
 
-	jwtCache, err := auth.NewJWKSet(ctx, jwksURL)
+	jwtCache, err := auth.NewJWKSet(ctx, authConfig.JWKSURL)
 	if err != nil {
 		return err
 	}
@@ -64,7 +65,7 @@ func handle(
 			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
 		))
 
-		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
+		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetHealth",
@@ -83,7 +84,7 @@ func handle(
 			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
 		))
 
-		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
+		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
 
 		if clients.DB != nil {
 			huma.Register(

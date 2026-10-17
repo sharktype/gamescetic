@@ -12,8 +12,7 @@ func TestNewPool(t *testing.T) {
 	pool, err := newPool(
 		context.Background(),
 		zap.NewNop(),
-		"mysql",
-		"mysql://localhost:3306/test",
+		Config{Driver: "mysql", DSN: "mysql://localhost:3306/test"},
 	)
 
 	if pool != nil {

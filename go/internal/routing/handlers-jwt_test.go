@@ -9,28 +9,16 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
 )
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("an unsecured operation never sets a subject", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		var subject string
 
@@ -65,17 +53,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a verified token sets the subject", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		var subject string
 
@@ -109,17 +87,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		idp := newTestIDP(t)
 		otherIDP := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		handlerRan := false
 
@@ -152,17 +120,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a token without a subject is rejected", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router := chi.NewMux()
-		api := MustNewAPI(
-			router,
-			huma.DefaultConfig("test", "0.0.0"),
-			idp.cache,
-			idp.JWKSURL,
-			idp.Issuer,
-			idp.Audience,
-			clients.NewStubs(),
-			zap.NewNop(),
-		)
+		router, api := newStubAPI(t, idp)
 
 		handlerRan := false
 
@@ -249,11 +207,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 					nil,
 				}
 
-				router := chi.NewMux()
-				api := MustNewAPI(
-					router, huma.DefaultConfig("test", "0.0.0"), idp.cache, idp.JWKSURL, idp.Issuer, idp.Audience,
-					&clients.Clients{DB: client}, zap.NewNop(),
-				)
+				router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
 
 				handlerRan := false
 

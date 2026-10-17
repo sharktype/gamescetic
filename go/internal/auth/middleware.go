@@ -57,7 +57,7 @@ func RequireUserMiddleware(
 }
 
 func NewJWTAuthMiddleware(
-	api huma.API, cache *jwk.Cache, jwksURL, issuer, audience string,
+	api huma.API, cache *jwk.Cache, cfg Config,
 ) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		required := false
@@ -85,7 +85,7 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
-		parsed, err := parseToken(ctx.Context(), cache, jwksURL, issuer, audience, token)
+		parsed, err := parseToken(ctx.Context(), cache, cfg, token)
 		if err != nil {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
@@ -134,9 +134,12 @@ func MustSingleJWTRequirement(_ *huma.OpenAPI, operation *huma.Operation) {
 
 // parseToken verifies the signature and claims of a bearer token.
 func parseToken(
-	ctx context.Context, cache *jwk.Cache, jwksURL, issuer, audience, token string,
+	ctx context.Context,
+	cache *jwk.Cache,
+	cfg Config,
+	token string,
 ) (jwt.Token, error) {
-	keySet, err := cache.Lookup(ctx, jwksURL)
+	keySet, err := cache.Lookup(ctx, cfg.JWKSURL)
 	if err != nil {
 		return nil, err
 	}
@@ -146,8 +149,8 @@ func parseToken(
 	return jwt.ParseString(token,
 		jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
 		jwt.WithValidate(true),
-		jwt.WithIssuer(issuer),
-		jwt.WithAudience(audience),
+		jwt.WithIssuer(cfg.Issuer),
+		jwt.WithAudience(cfg.Audience),
 	)
 }
 

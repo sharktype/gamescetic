@@ -5,13 +5,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sharktype/satchel/db"
 	sqlc "github.com/sharktype/satchel/db"
 )
 
 // store implements the Client interface.
 type store struct {
-	*db.Queries
+	*sqlc.Queries
 	db   pool
 	inTx bool
 }
