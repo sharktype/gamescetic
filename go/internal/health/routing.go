@@ -36,6 +36,9 @@ func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput
 
 	user, ok := auth.ViewerFromContext(ctx)
 	if !ok {
+		// Defensive: this actually isn't expected to be reachable since the middleware should 403
+		// when the user is not authenticated.
+
 		resp.Body.Message = "no authenticated user in context"
 
 		return resp, huma.Error500InternalServerError("authenticated request has no user")
