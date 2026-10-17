@@ -9,11 +9,10 @@ import (
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	dbtest "github.com/sharktype/satchel/internal/db-test"
-	"github.com/sharktype/satchel/internal/logger"
 )
 
 func TestExecTx(t *testing.T) {
-	cfg := config.MustNew(logger.MustNew())
+	cfg := config.MustNew()
 
 	database := dbtest.New(t, cfg.Clients.DB.DSN)
 

@@ -5,6 +5,13 @@ type Config struct {
 	Clients Clients `envPrefix:"CLIENTS_"`
 	CORS    CORS    `envPrefix:"CORS_"`
 	API     API     `envPrefix:"API_"`
+
+	Verbose bool `env:"VERBOSE" envDefault:"false"`
+
+	// Production is resolved from the real environment before .env is loaded, so it is not
+	// env-tagged; see newConfig.
+
+	Production bool `env:"-"`
 }
 
 type Auth struct {

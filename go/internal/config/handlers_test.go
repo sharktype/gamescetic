@@ -4,8 +4,6 @@ import (
 	"slices"
 	"strings"
 	"testing"
-
-	"go.uber.org/zap"
 )
 
 func setRequiredEnv(t *testing.T) {
@@ -26,8 +24,9 @@ func setRequiredEnv(t *testing.T) {
 func TestNewConfig(t *testing.T) {
 	t.Run("every setting is read", func(t *testing.T) {
 		setRequiredEnv(t)
+		t.Setenv("VERBOSE", "true")
 
-		cfg, err := newConfig(zap.NewNop())
+		cfg, err := newConfig()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,6 +66,10 @@ func TestNewConfig(t *testing.T) {
 		if cfg.CORS.MaxAge != 86400 {
 			t.Fatalf("got max age %d, want %d", cfg.CORS.MaxAge, 86400)
 		}
+
+		if !cfg.Verbose {
+			t.Fatal("got verbose false, want true")
+		}
 	})
 
 	t.Run("every setting is required", func(t *testing.T) {
@@ -88,7 +91,7 @@ func TestNewConfig(t *testing.T) {
 				setRequiredEnv(t)
 				t.Setenv(key, "")
 
-				_, err := newConfig(zap.NewNop())
+				_, err := newConfig()
 				if err == nil || !strings.Contains(err.Error(), key) {
 					t.Fatalf("got error %v, want it to mention %q", err, key)
 				}

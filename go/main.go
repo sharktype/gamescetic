@@ -35,8 +35,18 @@ type Options struct {
 func main() {
 	ctx := context.Background()
 
-	logger := logger.MustNew()
-	cfg := config.MustNew(logger)
+	cfg := config.MustNew()
+
+	logger := logger.MustNew(logger.Config{
+		Production: cfg.Production,
+		Verbose:    cfg.Verbose,
+	})
+
+	if cfg.Production {
+		logger.Info("app booting in production mode...")
+	} else {
+		logger.Info("app booting in development mode...")
+	}
 
 	appClients := clients.MustNew(ctx, logger, db.Config{DSN: cfg.Clients.DB.DSN})
 
@@ -86,6 +96,8 @@ func main() {
 			if err := server.Shutdown(shutdownCtx); err != nil {
 				logger.Error(fmt.Sprintf("error shutting down server: %v", err))
 			}
+
+			_ = logger.Sync()
 		})
 	})
 
