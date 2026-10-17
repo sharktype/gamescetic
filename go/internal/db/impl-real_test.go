@@ -13,8 +13,6 @@ import (
 )
 
 func TestExecTx(t *testing.T) {
-	t.Setenv("PRODUCTION", "1")
-
 	cfg := config.MustNew(logger.MustNew())
 	if cfg.Clients.DB == nil || cfg.Clients.DB.DSN == nil {
 		t.Skip("CLIENTS_DB_DSN is not set")

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -22,8 +23,7 @@ func newConfig(logger *zap.Logger) (*Config, error) {
 	if os.Getenv("PRODUCTION") == "" {
 		logger.Info("app booting in development mode...")
 
-		err := godotenv.Load(".env")
-		if err != nil {
+		if err := godotenv.Load(".env"); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return nil, fmt.Errorf("failed to load .env file: %w", err)
 		}
 	} else {
