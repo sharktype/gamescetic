@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"context"
+	"errors"
 	"net/http"
 	"slices"
 	"strings"
@@ -9,40 +9,53 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/sharktype/satchel/internal/clients"
 	"go.uber.org/zap"
 )
 
 type contextKey int
 
-const subjectKey contextKey = iota
+const (
+	subjectKey contextKey = iota
+	userKey
+)
 
-// EnsureUserMiddleware must run after the JWT middleware; otherwise unverified token.
-func EnsureUserMiddleware(
-	clients *clients.Clients, logger *zap.Logger,
-) func(http.Handler) http.Handler {
-	manager := NewManager(clients.DB)
+// RequireUserMiddleware requires an authenticated user is in context.
+//
+// It must be registered after NewJWTAuthMiddleware, and does not test authorization; just that
+// the user exists at all; i.e. is not anonymous.
+func RequireUserMiddleware(
+	api huma.API, manager *Manager, logger *zap.Logger,
+) func(ctx huma.Context, next func(huma.Context)) {
+	return func(ctx huma.Context, next func(huma.Context)) {
+		sub, ok := SubjectFromContext(ctx.Context())
+		if !ok {
+			next(ctx)
 
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			token := strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
+			return
+		}
 
-			if token != "" {
-				if err := manager.EnsureUser(request.Context(), token); err != nil {
-					logger.Error("error ensuring user in middleware", zap.Error(err))
-					http.Error(writer, "Unauthorized", http.StatusUnauthorized)
+		user, err := manager.RequireUser(ctx.Context(), sub)
+		if errors.Is(err, ErrUserNotProvisioned) {
+			logger.Warn("verified subject is not provisioned", zap.String("sub", sub))
+			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
-					return
-				}
-			}
+			return
+		}
 
-			next.ServeHTTP(writer, request)
-		})
+		if err != nil {
+			logger.Error("error resolving user in middleware", zap.Error(err))
+			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
+
+			return
+		}
+
+		next(huma.WithValue(ctx, userKey, user))
 	}
 }
 
+// NewJWTAuthMiddleware places the subject based on JWT auth in the context.
 func NewJWTAuthMiddleware(
-	api huma.API, cfg *Config, cache *jwk.Cache,
+	api huma.API, cache *jwk.Cache, jwksURL, issuer, audience string,
 ) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		var neededScopes []string
@@ -63,14 +76,14 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
-		token := strings.TrimPrefix(ctx.Header("Authorization"), "Bearer ")
-		if token == "" {
+		token, ok := bearerToken(ctx.Header("Authorization"))
+		if !ok {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
 		}
 
-		keySet, err := cache.Lookup(ctx.Context(), cfg.JWKSURL)
+		keySet, err := cache.Lookup(ctx.Context(), jwksURL)
 		if err != nil {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
@@ -80,8 +93,8 @@ func NewJWTAuthMiddleware(
 		parsed, err := jwt.ParseString(token,
 			jwt.WithKeySet(keySet),
 			jwt.WithValidate(true),
-			jwt.WithIssuer(cfg.Issuer),
-			jwt.WithAudience(cfg.Audience),
+			jwt.WithIssuer(issuer),
+			jwt.WithAudience(audience),
 		)
 		if err != nil {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
@@ -89,17 +102,24 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
+		sub, ok := parsed.Subject()
+		if !ok || sub == "" {
+			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+
+			return
+		}
+
+		ctx = huma.WithValue(ctx, subjectKey, sub)
+
 		if len(neededScopes) == 0 {
 			next(ctx)
 
 			return
 		}
 
-		var scopes []string
-		if err := parsed.Get("scopes", &scopes); err == nil {
-			for _, scope := range scopes {
-				if slices.Contains(neededScopes, scope) {
-					next(ctx)
+		next(ctx)
+	}
+}
 
 					return
 				}
@@ -110,18 +130,18 @@ func NewJWTAuthMiddleware(
 	}
 }
 
-// SubjectMiddleware extracts the subject without re-verifying the token; middleware already did.
-func SubjectMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		token := strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
-		if token != "" {
-			if parsed, err := jwt.ParseInsecure([]byte(token)); err == nil {
-				if sub, ok := parsed.Subject(); ok && sub != "" {
-					request = request.WithContext(context.WithValue(request.Context(), subjectKey, sub))
-				}
-			}
-		}
+// bearerToken extracts the token from an Authorization header value.
+func bearerToken(header string) (string, bool) {
+	const prefix = "Bearer "
 
-		next.ServeHTTP(writer, request)
-	})
+	if len(header) < len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
+		return "", false
+	}
+
+	token := strings.TrimSpace(header[len(prefix):])
+	if token == "" || strings.ContainsAny(token, " \t") {
+		return "", false
+	}
+
+	return token, true
 }

@@ -7,11 +7,11 @@ import (
 
 	"github.com/lestrrat-go/httprc/v3"
 	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/sharktype/satchel/db"
 )
 
 const DefaultJWTSchemeKey = "JWT"
 
-// NewJWKSet creates an auto-refreshing key set to validate JWT signatures.
 func NewJWKSet(ctx context.Context, jwkUrl string) (*jwk.Cache, error) {
 	httpClient := httprc.NewClient()
 
@@ -36,9 +36,14 @@ func NewJWKSet(ctx context.Context, jwkUrl string) (*jwk.Cache, error) {
 	return jwkCache, nil
 }
 
-// SubjectFromContext returns the JWT subject stored by SubjectMiddleware.
 func SubjectFromContext(ctx context.Context) (string, bool) {
 	s, ok := ctx.Value(subjectKey).(string)
 
 	return s, ok && s != ""
+}
+
+func ViewerFromContext(ctx context.Context) (db.User, bool) {
+	user, ok := ctx.Value(userKey).(db.User)
+
+	return user, ok
 }
