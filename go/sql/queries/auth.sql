@@ -1,7 +1,7 @@
 -- name: GetUserBySub :one
 SELECT
-    sqlc.embed(u)
+    *
 FROM
-    "user" u
+    "user"
 WHERE
-    u.sub = $1;
+    sub = $1;

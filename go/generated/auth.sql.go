@@ -11,28 +11,24 @@ import (
 
 const getUserBySub = `-- name: GetUserBySub :one
 SELECT
-    u.id, u.sub, u.name, u.email, u.avatar_url, u.created_at, u.updated_at
+    id, sub, name, email, avatar_url, created_at, updated_at
 FROM
-    "user" u
+    "user"
 WHERE
-    u.sub = $1
+    sub = $1
 `
 
-type GetUserBySubRow struct {
-	User User
-}
-
-func (q *Queries) GetUserBySub(ctx context.Context, sub string) (GetUserBySubRow, error) {
+func (q *Queries) GetUserBySub(ctx context.Context, sub string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserBySub, sub)
-	var i GetUserBySubRow
+	var i User
 	err := row.Scan(
-		&i.User.ID,
-		&i.User.Sub,
-		&i.User.Name,
-		&i.User.Email,
-		&i.User.AvatarUrl,
-		&i.User.CreatedAt,
-		&i.User.UpdatedAt,
+		&i.ID,
+		&i.Sub,
+		&i.Name,
+		&i.Email,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
 	)
 	return i, err
 }

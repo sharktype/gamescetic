@@ -21,7 +21,7 @@ func NewManager(client db.Client) *Manager {
 }
 
 func (m *Manager) RequireUser(ctx context.Context, sub string) (generated.User, error) {
-	row, err := m.DB.GetUserBySub(ctx, sub)
+	user, err := m.DB.GetUserBySub(ctx, sub)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return generated.User{}, ErrUserNotProvisioned
 	}
@@ -30,5 +30,5 @@ func (m *Manager) RequireUser(ctx context.Context, sub string) (generated.User, 
 		return generated.User{}, fmt.Errorf("failed to look up user %q: %w", sub, err)
 	}
 
-	return row.User, nil
+	return user, nil
 }
