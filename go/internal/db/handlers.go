@@ -9,6 +9,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// driver is the only supported database driver.
+const driver = "postgres"
+
 func MustNewPool(ctx context.Context, logger *zap.Logger, cfg Config) *pgxpool.Pool {
 	pool, err := newPool(ctx, logger, cfg)
 
@@ -18,11 +21,7 @@ func MustNewPool(ctx context.Context, logger *zap.Logger, cfg Config) *pgxpool.P
 }
 
 func newPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool, error) {
-	if cfg.Driver != "postgres" {
-		return nil, fmt.Errorf("unsupported database driver: %s", cfg.Driver)
-	}
-
-	logger.Debug("connecting to database and testing connection...")
+	logger.Debug(fmt.Sprintf("connecting to %s and testing connection...", driver))
 
 	pool, err := pgxpool.New(ctx, cfg.DSN)
 	if err != nil {
@@ -33,7 +32,7 @@ func newPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool
 		return nil, err
 	}
 
-	logger.Info("database connection successful")
+	logger.Info(fmt.Sprintf("%s connection successful", driver))
 
 	return pool, nil
 }

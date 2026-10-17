@@ -38,10 +38,7 @@ func main() {
 	logger := logger.MustNew()
 	cfg := config.MustNew(logger)
 
-	appClients := clients.MustNew(ctx, logger, db.Config{
-		Driver: cfg.Clients.DB.Driver,
-		DSN:    cfg.Clients.DB.DSN,
-	})
+	appClients := clients.MustNew(ctx, logger, db.Config{DSN: cfg.Clients.DB.DSN})
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
 		router := routing.MustNewRouter(httpx.MustNewCORSHandler(httpx.CORSConfig{

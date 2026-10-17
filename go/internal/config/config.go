@@ -18,8 +18,7 @@ type Clients struct {
 }
 
 type DB struct {
-	Driver string `env:"DRIVER,required,notEmpty"`
-	DSN    string `env:"DSN,required,notEmpty"`
+	DSN string `env:"DSN,required,notEmpty"`
 }
 
 type CORS struct {

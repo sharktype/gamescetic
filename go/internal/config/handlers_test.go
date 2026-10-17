@@ -11,7 +11,6 @@ import (
 func setRequiredEnv(t *testing.T) {
 	t.Helper()
 
-	t.Setenv("CLIENTS_DB_DRIVER", "postgres")
 	t.Setenv("CLIENTS_DB_DSN", "postgres://localhost:5432/foobar")
 	t.Setenv("AUTH_JWKSURL", "https://example.com/jwks")
 	t.Setenv("AUTH_ISSUER", "https://example.com")
@@ -30,10 +29,6 @@ func TestNewConfig(t *testing.T) {
 	cfg, err := newConfig(zap.NewNop())
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	if cfg.Clients.DB.Driver != "postgres" {
-		t.Fatalf("got driver %q, want %q", cfg.Clients.DB.Driver, "postgres")
 	}
 
 	if cfg.Clients.DB.DSN != "postgres://localhost:5432/foobar" {
@@ -75,7 +70,6 @@ func TestNewConfig(t *testing.T) {
 
 func TestNewConfigRequiresSettings(t *testing.T) {
 	keys := []string{
-		"CLIENTS_DB_DRIVER",
 		"CLIENTS_DB_DSN",
 		"AUTH_JWKSURL",
 		"AUTH_ISSUER",
