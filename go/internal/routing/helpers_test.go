@@ -8,9 +8,10 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/generated"
-	test_auth "github.com/sharktype/satchel/internal/auth/test-auth"
+	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/clients"
-	test_db "github.com/sharktype/satchel/internal/db/test-db"
+	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/internal/db/dbtest"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
@@ -26,12 +27,16 @@ func provisionedUser() generated.User {
 	}
 }
 
+func provisionedUsers() db.Client {
+	return &dbtest.Stub{User: provisionedUser()}
+}
+
 func provisionedClients() *clients.Clients {
-	return &clients.Clients{DB: &test_db.Stub{User: provisionedUser()}}
+	return &clients.Clients{DB: provisionedUsers()}
 }
 
 func newTestAPI(
-	t *testing.T, idp *test_auth.IDP, appClients *clients.Clients,
+	t *testing.T, idp *authtest.IDP, dbClient db.Client,
 ) (chi.Router, *huma.Group, *huma.Group) {
 	t.Helper()
 
@@ -41,7 +46,7 @@ func newTestAPI(
 		huma.DefaultConfig("test", "0.0.0"),
 		idp.Cache,
 		idp.Config(),
-		appClients,
+		dbClient,
 		zap.NewNop(),
 	)
 
@@ -61,7 +66,7 @@ func testRouter(t *testing.T) *chi.Mux {
 	return NewRouter(corsHandler)
 }
 
-func newHandledRouter(t *testing.T, idp *test_auth.IDP) http.Handler {
+func newHandledRouter(t *testing.T, idp *authtest.IDP) http.Handler {
 	t.Helper()
 
 	router := testRouter(t)

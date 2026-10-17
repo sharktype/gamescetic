@@ -35,7 +35,7 @@ func Handle(
 		return err
 	}
 
-	public, secured := NewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
+	public, secured := NewAPI(r, humaConfig, jwtCache, authConfig, clients.DB, logger)
 
 	register(logger, public, huma.Operation{
 		OperationID: "GetHealth",
@@ -49,7 +49,7 @@ func Handle(
 		Summary:     "Get Database Health",
 		Method:      http.MethodGet,
 		Path:        "/health/db",
-	}, health.GetDatabaseHealth(logger, clients))
+	}, health.GetDatabaseHealth(logger, clients.DB))
 
 	register(logger, secured, huma.Operation{
 		OperationID: "GetAuthHealth",

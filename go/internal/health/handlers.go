@@ -6,7 +6,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/clients"
+	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
 )
 
@@ -47,12 +47,12 @@ func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput
 }
 
 func GetDatabaseHealth(
-	logger *zap.Logger, clients *clients.Clients,
+	logger *zap.Logger, database db.Client,
 ) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}
 
-		if err := clients.DB.Ping(ctx); err != nil {
+		if err := database.Ping(ctx); err != nil {
 			logger.Error("database health check failed", zap.Error(err))
 
 			return resp, huma.Error503ServiceUnavailable("database unavailable")

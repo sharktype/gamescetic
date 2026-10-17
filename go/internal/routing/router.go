@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/httprate"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/clients"
+	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
@@ -36,7 +36,7 @@ func NewAPI(
 	humaConfig huma.Config,
 	jwtCache *jwk.Cache,
 	authConfig auth.Config,
-	clients *clients.Clients,
+	dbClient db.Client,
 	logger *zap.Logger,
 ) (public *huma.Group, secured *huma.Group) {
 	api := humachi.New(r, humaConfig)
@@ -49,7 +49,7 @@ func NewAPI(
 	secured.UseSimpleModifier(declareJWT)
 	secured.UseMiddleware(
 		rateLimit(securedRateLimit),
-		auth.NewJWTAuthMiddleware(api, jwtCache, authConfig, clients.DB, logger),
+		auth.NewJWTAuthMiddleware(api, jwtCache, authConfig, dbClient, logger),
 	)
 
 	return public, secured
@@ -113,7 +113,7 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 func declareJWT(operation *huma.Operation) {
 	if !declaresJWT(operation) {
 		operation.Security = append(
-			operation.Security, map[string][]string{auth.DefaultJWTSchemeKey: {}},
+			operation.Security, map[string][]string{auth.JWTSchemeKey: {}},
 		)
 	}
 }
@@ -129,7 +129,7 @@ func mustNotDeclareJWT(operation *huma.Operation) {
 
 func declaresJWT(operation *huma.Operation) bool {
 	for _, requirement := range operation.Security {
-		if _, ok := requirement[auth.DefaultJWTSchemeKey]; ok {
+		if _, ok := requirement[auth.JWTSchemeKey]; ok {
 			return true
 		}
 	}
