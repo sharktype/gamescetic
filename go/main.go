@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humacli"
@@ -13,9 +14,15 @@ import (
 	"github.com/sharktype/satchel/internal/routing"
 )
 
-// Note: You will probably not need to edit this file when copying this template.
+const readHeaderTimeout = 5 * time.Second
+const readTimeout = 30 * time.Second
 
-// Options for the CLI. Pass `--port` or set the `SERVICE_PORT` env var.
+// WriteTimeout has to outlast the router's own middleware.Timeout to ensure the response is fully
+// written before the middleware times out.
+
+const writeHeaderTimeout = 10 * time.Second
+const idleTimeout = 120 * time.Second
+
 type Options struct {
 	Port int `help:"port to listen on" short:"p" default:"8888"`
 }
@@ -39,21 +46,35 @@ func main() {
 	}
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
-		router := routing.NewRouter(cfg.CORS)
-
-		err = routing.Handle(ctx, router, huma.DefaultConfig(cfg.API.Title, cfg.API.Version), cfg, appClients, logger)
+		router, err := routing.NewRouter(cfg.CORS)
 		if err != nil {
-			// This error can only happen when initializing the routing, not for runtime errors.
-
 			panic(fmt.Sprintf("error setting up routing: %v", err))
+		}
+
+		err = routing.Handle(
+			ctx,
+			router,
+			huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
+			cfg,
+			appClients,
+			logger,
+		)
+		if err != nil {
+			panic(fmt.Sprintf("error setting up routing: %v", err))
+		}
+
+		server := &http.Server{
+			Addr:              fmt.Sprintf(":%d", options.Port),
+			Handler:           router,
+			ReadHeaderTimeout: readHeaderTimeout,
+			ReadTimeout:       readTimeout,
+			WriteTimeout:      writeHeaderTimeout,
+			IdleTimeout:       idleTimeout,
 		}
 
 		hooks.OnStart(func() {
 			logger.Info(fmt.Sprintf("starting server on port %d", options.Port))
-			err := http.ListenAndServe(fmt.Sprintf(":%d", options.Port), router)
-			if err != nil {
-				// This will normally only happen if the server fails to start.
-
+			if err := server.ListenAndServe(); err != nil {
 				panic(err)
 			}
 		})
