@@ -11,7 +11,6 @@ import (
 type Querier interface {
 	GetMeta(ctx context.Context, key string) (string, error)
 	GetUserBySub(ctx context.Context, sub string) (User, error)
-	Placeholder(ctx context.Context) (string, error)
 	SetMeta(ctx context.Context, arg SetMetaParams) error
 }
 

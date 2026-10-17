@@ -1,5 +1,3 @@
--- name: Placeholder :one
-SELECT 'OK';
 
 -- name: SetMeta :exec
 INSERT INTO "meta" (key, value)

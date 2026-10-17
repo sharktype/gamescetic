@@ -22,17 +22,6 @@ func (q *Queries) GetMeta(ctx context.Context, key string) (string, error) {
 	return value, err
 }
 
-const placeholder = `-- name: Placeholder :one
-SELECT 'OK'
-`
-
-func (q *Queries) Placeholder(ctx context.Context) (string, error) {
-	row := q.db.QueryRow(ctx, placeholder)
-	var column_1 string
-	err := row.Scan(&column_1)
-	return column_1, err
-}
-
 const setMeta = `-- name: SetMeta :exec
 INSERT INTO "meta" (key, value)
 VALUES ($1, $2)
