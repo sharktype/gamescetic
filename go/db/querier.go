@@ -9,7 +9,6 @@ import (
 )
 
 type Querier interface {
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	GetMeta(ctx context.Context, key string) (string, error)
 	GetUserBySub(ctx context.Context, sub string) (GetUserBySubRow, error)
 	Placeholder(ctx context.Context) (string, error)

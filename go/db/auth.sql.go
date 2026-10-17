@@ -9,44 +9,6 @@ import (
 	"context"
 )
 
-const createUser = `-- name: CreateUser :one
-INSERT INTO
-    "user" (id, sub, name, email, avatar_url)
-VALUES
-    ($1, $2, $3, $4, $5)
-RETURNING
-    id, sub, name, email, avatar_url, created_at, updated_at
-`
-
-type CreateUserParams struct {
-	ID        string
-	Sub       string
-	Name      string
-	Email     string
-	AvatarUrl *string
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser,
-		arg.ID,
-		arg.Sub,
-		arg.Name,
-		arg.Email,
-		arg.AvatarUrl,
-	)
-	var i User
-	err := row.Scan(
-		&i.ID,
-		&i.Sub,
-		&i.Name,
-		&i.Email,
-		&i.AvatarUrl,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
 const getUserBySub = `-- name: GetUserBySub :one
 SELECT
     u.id, u.sub, u.name, u.email, u.avatar_url, u.created_at, u.updated_at
