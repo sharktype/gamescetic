@@ -55,25 +55,7 @@ func handle(
 		return err
 	}
 
-	// huma registers these as plain routes; gate on the router rather than through the middleware.
-
-	r.Use(auth.RequireTokenForPaths(
-		jwtCache,
-		jwksURL,
-		issuer,
-		audience,
-		[]string{
-			humaConfig.DocsPath,
-			humaConfig.OpenAPIPath + ".json",
-			humaConfig.OpenAPIPath + ".yaml",
-			humaConfig.OpenAPIPath + "-3.0.json",
-			humaConfig.OpenAPIPath + "-3.0.yaml",
-		},
-	))
-
-	// Reminder: default body size limit is 1 MiB.
-
-	// Group 1 (rate limit 50 /s). Also, remember global rate limiting is 100 /s (middleware).
+	// Group 1 (rate limit 50 /min). Also, remember global rate limiting is 100 /min (middleware).
 
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.Limit(
@@ -92,7 +74,7 @@ func handle(
 		}, withErrorLogging(logger, "GetHealth", health.GetHealth))
 	})
 
-	// Group 2 (rate limit 30 /s).
+	// Group 2 (rate limit 30 /min).
 
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.Limit(

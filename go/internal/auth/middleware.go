@@ -151,35 +151,6 @@ func parseToken(
 	)
 }
 
-func RequireTokenForPaths(
-	cache *jwk.Cache, jwksURL, issuer, audience string, paths []string,
-) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			if !slices.Contains(paths, request.URL.Path) {
-				next.ServeHTTP(writer, request)
-
-				return
-			}
-
-			token, ok := bearerToken(request.Header.Get("Authorization"))
-			if !ok {
-				http.Error(writer, "Unauthorized", http.StatusUnauthorized)
-
-				return
-			}
-
-			if _, err := parseToken(request.Context(), cache, jwksURL, issuer, audience, token); err != nil {
-				http.Error(writer, "Unauthorized", http.StatusUnauthorized)
-
-				return
-			}
-
-			next.ServeHTTP(writer, request)
-		})
-	}
-}
-
 func hasAllScopes(token jwt.Token, wanted []string) bool {
 	granted := grantedScopes(token)
 
