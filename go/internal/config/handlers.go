@@ -14,6 +14,7 @@ import (
 
 func MustNew(logger *zap.Logger) *Config {
 	cfg, err := newConfig(logger)
+
 	utils.Must(err, "error loading config")
 
 	return cfg

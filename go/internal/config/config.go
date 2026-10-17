@@ -4,8 +4,7 @@ type Config struct {
 	Auth    Auth    `envPrefix:"AUTH_"`
 	Clients Clients `envPrefix:"CLIENTS_"`
 	CORS    CORS    `envPrefix:"CORS_"`
-
-	API API `envPrefix:"API_"`
+	API     API     `envPrefix:"API_"`
 }
 
 type Auth struct {
