@@ -20,7 +20,7 @@ type pool interface {
 	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
 }
 
-func New(pool *pgxpool.Pool) Client {
+func MustNew(pool *pgxpool.Pool) Client {
 	return &store{
 		Queries: sqlc.New(pool),
 		db:      pool,

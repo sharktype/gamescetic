@@ -38,7 +38,7 @@ func New(t testing.TB, dsn string) *Client {
 	}
 
 	client := &Client{
-		Client: db.New(pool),
+		Client: db.MustNew(pool),
 		pool:   pool,
 	}
 

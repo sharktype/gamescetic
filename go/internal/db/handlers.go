@@ -9,7 +9,16 @@ import (
 	"go.uber.org/zap"
 )
 
-func NewPool(ctx context.Context, cfg *Config, logger *zap.Logger) (Client, error) {
+func MustNewPool(ctx context.Context, cfg *Config, logger *zap.Logger) *pgxpool.Pool {
+	pool, err := newPool(ctx, cfg, logger)
+	if err != nil {
+		panic(fmt.Sprintf("error creating database pool: %v", err))
+	}
+
+	return pool
+}
+
+func newPool(ctx context.Context, cfg *Config, logger *zap.Logger) (*pgxpool.Pool, error) {
 	if cfg == nil || cfg.Driver == nil || cfg.DSN == nil {
 		return nil, errors.New("database connection is required")
 	}
@@ -30,5 +39,5 @@ func NewPool(ctx context.Context, cfg *Config, logger *zap.Logger) (Client, erro
 
 	logger.Info("postgres database connection successful")
 
-	return New(pool), nil
+	return pool, nil
 }
