@@ -59,7 +59,7 @@ func handle(
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, 1*time.Minute))
 
-		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience)
+		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetHealth",
@@ -73,11 +73,8 @@ func handle(
 
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(100, 1*time.Minute))
-		if clients.DB != nil {
-			r.Use(auth.EnsureUserMiddleware(logger, clients))
-		}
 
-		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience)
+		api := MustNewAPI(r, humaConfig, jwtCache, jwksURL, issuer, audience, clients, logger)
 
 		if clients.DB != nil {
 			huma.Register(

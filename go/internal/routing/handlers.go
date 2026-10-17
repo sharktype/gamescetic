@@ -9,15 +9,23 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
+	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/http"
+	"go.uber.org/zap"
 )
 
 func MustNewAPI(
-	r chi.Router, humaConfig huma.Config, jwtCache *jwk.Cache, jwksURL, issuer, audience string,
+	r chi.Router,
+	humaConfig huma.Config,
+	jwtCache *jwk.Cache,
+	jwksURL, issuer, audience string,
+	clients *clients.Clients,
+	logger *zap.Logger,
 ) huma.API {
 	api := humachi.New(r, humaConfig)
 
 	api.UseMiddleware(auth.NewJWTAuthMiddleware(api, jwtCache, jwksURL, issuer, audience))
+	api.UseMiddleware(auth.RequireUserMiddleware(api, auth.NewManager(clients.DB), logger))
 
 	return api
 }
