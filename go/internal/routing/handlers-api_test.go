@@ -6,14 +6,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/health"
 )
 
@@ -21,7 +18,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Open",
@@ -42,7 +39,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("a secured operation rejects a request without providing a token", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Secured",
@@ -64,7 +61,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("a secured operation rejects a non-bearer header", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		huma.Register(api, huma.Operation{
 			OperationID: "Secured",
@@ -89,12 +86,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("auth health answers with the viewer", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		client := db.NewStub()
-		client.Row = []any{
-			"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com", nil, time.Now(), nil,
-		}
-
-		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+		router, api := newTestAPI(t, idp, provisionedClients())
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetAuthHealth",
@@ -129,12 +121,7 @@ func TestMustNewAPI(t *testing.T) {
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		client := db.NewStub()
-		client.Row = []any{
-			"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com", nil, time.Now(), nil,
-		}
-
-		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+		router, api := newTestAPI(t, idp, provisionedClients())
 
 		huma.Register(api, huma.Operation{
 			OperationID: "GetErrorHealth",

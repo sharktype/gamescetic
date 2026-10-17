@@ -5,23 +5,21 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
+	dbtest "github.com/sharktype/satchel/internal/db-test"
 )
 
 func TestRequireUserMiddleware(t *testing.T) {
 	t.Run("a user that is not provisioned is forbidden", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		client := db.NewStub()
-		client.QueryRowErr = pgx.ErrNoRows
+		unprovisioned := &clients.Clients{DB: &dbtest.Stub{UserErr: pgx.ErrNoRows}}
 
-		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+		router, api := newTestAPI(t, idp, unprovisioned)
 
 		handlerRan := false
 
@@ -54,18 +52,7 @@ func TestRequireUserMiddleware(t *testing.T) {
 	t.Run("a provisioned user is in the context", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		client := db.NewStub()
-		client.Row = []any{
-			"user-1",
-			"sub-1",
-			"Ada Lovelace",
-			"ada-lovelace@example.com",
-			nil,
-			time.Now(),
-			nil,
-		}
-
-		router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+		router, api := newTestAPI(t, idp, provisionedClients())
 
 		var viewerID string
 		var viewerEmail string

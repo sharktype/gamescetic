@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
@@ -19,11 +18,13 @@ func newHandledRouter(t *testing.T, idp *testIDP) http.Handler {
 		AllowedOrigins: []string{"http://example.com"},
 	}))
 
+	clients := provisionedClients()
+
 	MustHandle(
 		t.Context(),
 		zap.NewNop(),
 		router,
-		clients.NewStubs(),
+		clients,
 		huma.DefaultConfig("test", "1"),
 		idp.config(),
 	)

@@ -10,17 +10,14 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
+	dbtest "github.com/sharktype/satchel/internal/db-test"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func TestGetDatabaseHealth(t *testing.T) {
 	t.Run("a reachable database reports OK", func(t *testing.T) {
-		client := db.NewStub()
-		client.Row = []any{"OK"}
-
-		output, err := GetDatabaseHealth(zap.NewNop(), &clients.Clients{DB: client})(
+		output, err := GetDatabaseHealth(zap.NewNop(), &clients.Clients{DB: &dbtest.Stub{}})(
 			context.Background(), &GetHealthInput{},
 		)
 		if err != nil {
@@ -35,9 +32,6 @@ func TestGetDatabaseHealth(t *testing.T) {
 	t.Run("a failing check logs the cause and returns a fixed 503", func(t *testing.T) {
 		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
 
-		client := db.NewStub()
-		client.QueryRowErr = cause
-
 		var logged bytes.Buffer
 
 		logger := zap.New(zapcore.NewCore(
@@ -46,9 +40,9 @@ func TestGetDatabaseHealth(t *testing.T) {
 			zapcore.DebugLevel,
 		))
 
-		_, err := GetDatabaseHealth(logger, &clients.Clients{DB: client})(
-			context.Background(), &GetHealthInput{},
-		)
+		_, err := GetDatabaseHealth(
+			logger, &clients.Clients{DB: &dbtest.Stub{PlaceholderErr: cause}},
+		)(context.Background(), &GetHealthInput{})
 		if err == nil {
 			t.Fatal("expected an error")
 		}

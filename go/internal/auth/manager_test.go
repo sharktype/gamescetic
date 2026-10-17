@@ -4,52 +4,47 @@ import (
 	"context"
 	"errors"
 	"testing"
-	"time"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/generated"
+	dbtest "github.com/sharktype/satchel/internal/db-test"
 )
 
 func TestRequireUser(t *testing.T) {
 	arbitraryErr := errors.New("arbitrary error")
 
+	provisioned := generated.User{
+		ID:    "user-1",
+		Sub:   "sub-1",
+		Name:  "Ada Lovelace",
+		Email: "ada-lovelace@example.com",
+	}
+
 	tests := []struct {
 		name        string
-		row         []any
-		queryErr    error
-		expectedID  string
+		user        generated.User
+		userErr     error
 		expectedErr error
 	}{
 		{
 			name: "provisioned user",
-			row: []any{
-				"user-1",
-				"sub-1",
-				"Ada Lovelace",
-				"ada-lovelace@example.com",
-				nil,
-				time.Now(),
-				nil,
-			},
-			expectedID: "user-1",
+			user: provisioned,
 		},
 		{
 			name:        "unprovisioned user",
-			queryErr:    pgx.ErrNoRows,
+			userErr:     pgx.ErrNoRows,
 			expectedErr: ErrUserNotProvisioned,
 		},
 		{
 			name:        "lookup failure",
-			queryErr:    arbitraryErr,
+			userErr:     arbitraryErr,
 			expectedErr: arbitraryErr,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			stub := db.NewStub()
-			stub.Row = test.row
-			stub.QueryRowErr = test.queryErr
+			stub := &dbtest.Stub{User: test.user, UserErr: test.userErr}
 
 			user, err := NewManager(stub).RequireUser(context.Background(), "sub-1")
 
@@ -65,12 +60,8 @@ func TestRequireUser(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if user.ID != test.expectedID {
-				t.Fatalf("got user %q, want %q", user.ID, test.expectedID)
-			}
-
-			if user.Email != "ada-lovelace@example.com" {
-				t.Fatalf("got email %q, want %q", user.Email, "ada-lovelace@example.com")
+			if user != test.user {
+				t.Fatalf("got user %+v, want %+v", user, test.user)
 			}
 		})
 	}

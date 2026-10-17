@@ -5,7 +5,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/clients"
+	dbtest "github.com/sharktype/satchel/internal/db-test"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
@@ -16,6 +18,21 @@ type stubOutput struct {
 	Body struct {
 		Message string `json:"message"`
 	}
+}
+
+// "provisioned" means stubbed rather than using the real test database.
+
+func provisionedUser() generated.User {
+	return generated.User{
+		ID:    "user-1",
+		Sub:   "sub-1",
+		Name:  "Ada Lovelace",
+		Email: "ada-lovelace@example.com",
+	}
+}
+
+func provisionedClients() *clients.Clients {
+	return &clients.Clients{DB: &dbtest.Stub{User: provisionedUser()}}
 }
 
 func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Router, huma.API) {
@@ -34,10 +51,10 @@ func newTestAPI(t *testing.T, idp *testIDP, appClients *clients.Clients) (chi.Ro
 	return router, api
 }
 
-func newStubAPI(t *testing.T, idp *testIDP) (chi.Router, huma.API) {
+func newProvisionedAPI(t *testing.T, idp *testIDP) (chi.Router, huma.API) {
 	t.Helper()
 
-	return newTestAPI(t, idp, clients.NewStubs())
+	return newTestAPI(t, idp, provisionedClients())
 }
 
 func testRouter(t *testing.T) *chi.Mux {

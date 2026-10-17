@@ -6,19 +6,16 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
 )
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("an unsecured operation never sets a subject", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		var subject string
 
@@ -53,7 +50,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a verified token sets the subject", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		var subject string
 
@@ -87,7 +84,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		idp := newTestIDP(t)
 		otherIDP := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		handlerRan := false
 
@@ -120,7 +117,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a token without a subject is rejected", func(t *testing.T) {
 		idp := newTestIDP(t)
 
-		router, api := newStubAPI(t, idp)
+		router, api := newProvisionedAPI(t, idp)
 
 		handlerRan := false
 
@@ -196,18 +193,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				client := db.NewStub()
-				client.Row = []any{
-					"user-1",
-					"sub-1",
-					"Ada Lovelace",
-					"ada-lovelace@example.com",
-					nil,
-					time.Now(),
-					nil,
-				}
-
-				router, api := newTestAPI(t, idp, &clients.Clients{DB: client})
+				router, api := newTestAPI(t, idp, provisionedClients())
 
 				handlerRan := false
 
