@@ -23,7 +23,13 @@ func TestRequireUser(t *testing.T) {
 		{
 			name: "provisioned user",
 			row: []any{
-				"user-1", "sub-1", "Ada", "ada-lovelace@example.com", nil, time.Now(), nil,
+				"user-1",
+				"sub-1",
+				"Ada Lovelace",
+				"ada-lovelace@example.com",
+				nil,
+				time.Now(),
+				nil,
 			},
 			expectedID: "user-1",
 		},
