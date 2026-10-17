@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -25,6 +26,7 @@ const readTimeout = 30 * time.Second
 
 const writeTimeout = 70 * time.Second
 const idleTimeout = 120 * time.Second
+const shutdownTimeout = 30 * time.Second
 
 type Options struct {
 	Port int `help:"port to listen on" short:"p" default:"8888"`
@@ -75,8 +77,17 @@ func main() {
 
 		hooks.OnStart(func() {
 			logger.Info(fmt.Sprintf("starting server on port %d", options.Port))
-			if err := server.ListenAndServe(); err != nil {
+			if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 				panic(err)
+			}
+		})
+
+		hooks.OnStop(func() {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+			defer cancel()
+
+			if err := server.Shutdown(shutdownCtx); err != nil {
+				logger.Error(fmt.Sprintf("error shutting down server: %v", err))
 			}
 		})
 	})
