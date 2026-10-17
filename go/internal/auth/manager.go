@@ -32,12 +32,3 @@ func (m *Manager) RequireUser(ctx context.Context, sub string) (sqlc.User, error
 
 	return row.User, nil
 }
-
-func (m *Manager) FindViewerID(ctx context.Context) (string, bool) {
-	user, ok := ViewerFromContext(ctx)
-	if !ok {
-		return "", false
-	}
-
-	return user.ID, true
-}
