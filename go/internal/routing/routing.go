@@ -67,12 +67,13 @@ func handle(
 
 		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
 
-		huma.Register(api, huma.Operation{
+		op := huma.Operation{
 			OperationID: "GetHealth",
 			Summary:     "Get Health",
 			Method:      http.MethodGet,
 			Path:        "/health",
-		}, withErrorLogging(logger, "GetHealth", health.GetHealth))
+		}
+		huma.Register(api, op, withErrorLogging(logger, op, health.GetHealth))
 	})
 
 	// Group 2 (rate limit 30 /min).
@@ -87,50 +88,41 @@ func handle(
 		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
 
 		if clients.DB != nil {
-			huma.Register(
-				api,
-				huma.Operation{
-					OperationID: "GetDatabaseHealth",
-					Summary:     "Get Database Health",
-					Method:      http.MethodGet,
-					Path:        "/health/db",
-					Security: []map[string][]string{
-						{"JWT": {}},
-					},
+			op := huma.Operation{
+				OperationID: "GetDatabaseHealth",
+				Summary:     "Get Database Health",
+				Method:      http.MethodGet,
+				Path:        "/health/db",
+				Security: []map[string][]string{
+					{auth.DefaultJWTSchemeKey: {}},
 				},
-				withErrorLogging(
-					logger, "GetDatabaseHealth", health.GetDatabaseHealth(logger, clients),
-				),
+			}
+			huma.Register(
+				api, op, withErrorLogging(logger, op, health.GetDatabaseHealth(logger, clients)),
 			)
 		}
 
-		huma.Register(
-			api,
-			huma.Operation{
-				OperationID: "GetAuthHealth",
-				Summary:     "Get Auth Health",
-				Method:      http.MethodGet,
-				Path:        "/health/auth",
-				Security: []map[string][]string{
-					{"JWT": {}},
-				},
+		op := huma.Operation{
+			OperationID: "GetAuthHealth",
+			Summary:     "Get Auth Health",
+			Method:      http.MethodGet,
+			Path:        "/health/auth",
+			Security: []map[string][]string{
+				{auth.DefaultJWTSchemeKey: {}},
 			},
-			withErrorLogging(logger, "GetAuthHealth", health.GetAuthHealth),
-		)
+		}
+		huma.Register(api, op, withErrorLogging(logger, op, health.GetAuthHealth))
 
-		huma.Register(
-			api,
-			huma.Operation{
-				OperationID: "GetErrorHealth",
-				Summary:     "Get Error Health",
-				Method:      http.MethodGet,
-				Path:        "/health/error",
-				Security: []map[string][]string{
-					{"JWT": {}},
-				},
+		op = huma.Operation{
+			OperationID: "GetErrorHealth",
+			Summary:     "Get Error Health",
+			Method:      http.MethodGet,
+			Path:        "/health/error",
+			Security: []map[string][]string{
+				{auth.DefaultJWTSchemeKey: {}},
 			},
-			withErrorLogging(logger, "GetErrorHealth", health.GetErrorHealth),
-		)
+		}
+		huma.Register(api, op, withErrorLogging(logger, op, health.GetErrorHealth))
 	})
 
 	return nil
@@ -138,7 +130,7 @@ func handle(
 
 func withErrorLogging[I, O any](
 	logger *zap.Logger,
-	operation string,
+	operation huma.Operation,
 	callback func(context.Context, *I) (*O, error),
 ) func(context.Context, *I) (*O, error) {
 	// TODO: Report these to a bug tracker (Sentry or similar).
@@ -146,7 +138,11 @@ func withErrorLogging[I, O any](
 	return func(ctx context.Context, input *I) (*O, error) {
 		result, err := callback(ctx, input)
 		if err != nil {
-			logger.Error("router returned error", zap.String("operation", operation), zap.Error(err))
+			logger.Error(
+				"router returned error",
+				zap.String("operation", operation.OperationID),
+				zap.Error(err),
+			)
 		}
 
 		return result, err
