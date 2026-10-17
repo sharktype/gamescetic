@@ -3,7 +3,7 @@
 //   sqlc v1.31.1
 // source: meta.sql
 
-package db
+package generated
 
 import (
 	"context"

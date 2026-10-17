@@ -5,12 +5,12 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	sqlc "github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 )
 
 // store implements the Client interface.
 type store struct {
-	*sqlc.Queries
+	*generated.Queries
 	db   pool
 	inTx bool
 }
@@ -21,7 +21,7 @@ type pool interface {
 
 func MustNew(pool *pgxpool.Pool) Client {
 	return &store{
-		Queries: sqlc.New(pool),
+		Queries: generated.New(pool),
 		db:      pool,
 	}
 }

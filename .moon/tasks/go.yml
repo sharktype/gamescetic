@@ -48,10 +48,10 @@ tasks:
         preset: "utility"
 
     generate-sqlc:
-        script: "rm -rf db && sqlc generate"
+        script: "rm -rf generated && sqlc generate"
         preset: "utility"
         outputs:
-            - "db"
+            - "generated"
 
     lint:
         command: "golangci-lint run --fix"

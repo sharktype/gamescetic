@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	sqlc "github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	dbtest "github.com/sharktype/satchel/internal/db-test"
@@ -21,7 +21,7 @@ func TestExecTx(t *testing.T) {
 		database.CleanupAfter(t)
 
 		err := database.ExecTx(t.Context(), func(tx db.Client) error {
-			return tx.SetMeta(t.Context(), sqlc.SetMetaParams{
+			return tx.SetMeta(t.Context(), generated.SetMetaParams{
 				Key:   "key-1",
 				Value: "value-1",
 			})
@@ -46,7 +46,7 @@ func TestExecTx(t *testing.T) {
 		expectedErr := errors.New("arbitrary error")
 
 		err := database.ExecTx(t.Context(), func(tx db.Client) error {
-			if err := tx.SetMeta(t.Context(), sqlc.SetMetaParams{
+			if err := tx.SetMeta(t.Context(), generated.SetMetaParams{
 				Key:   "key-1",
 				Value: "value-1",
 			}); err != nil {
@@ -77,7 +77,7 @@ func TestExecTx(t *testing.T) {
 					t.Error("expected the inner callback to be transactional")
 				}
 
-				return inner.SetMeta(t.Context(), sqlc.SetMetaParams{
+				return inner.SetMeta(t.Context(), generated.SetMetaParams{
 					Key:   "key-1",
 					Value: "value-1",
 				})

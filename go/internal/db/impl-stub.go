@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
-	sqlc "github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 )
 
 // Stub implements the database client.
@@ -15,7 +15,7 @@ import (
 // Since transactions are ignored, you should only use this in the simplest of cases or where
 // actual behaviour of the database doesn't matter. Otherwise, use the testing client.
 type Stub struct {
-	*sqlc.Queries
+	*generated.Queries
 
 	QueryRowErr error
 
@@ -28,7 +28,7 @@ type Stub struct {
 
 func NewStub() *Stub {
 	stub := &Stub{}
-	stub.Queries = sqlc.New(stub)
+	stub.Queries = generated.New(stub)
 
 	return stub
 }

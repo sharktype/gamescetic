@@ -3,11 +3,11 @@ package db
 import (
 	"context"
 
-	"github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 )
 
 type Client interface {
-	db.Querier
+	generated.Querier
 
 	IsTx() bool
 	ExecTx(context.Context, func(Client) error) error

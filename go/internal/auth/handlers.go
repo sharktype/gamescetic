@@ -7,7 +7,7 @@ import (
 
 	"github.com/lestrrat-go/httprc/v3"
 	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 )
 
 const DefaultJWTSchemeKey = "JWT"
@@ -42,8 +42,8 @@ func SubjectFromContext(ctx context.Context) (string, bool) {
 	return s, ok && s != ""
 }
 
-func ViewerFromContext(ctx context.Context) (db.User, bool) {
-	user, ok := ctx.Value(userKey).(db.User)
+func ViewerFromContext(ctx context.Context) (generated.User, bool) {
+	user, ok := ctx.Value(userKey).(generated.User)
 
 	return user, ok
 }

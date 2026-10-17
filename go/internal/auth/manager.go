@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	sqlc "github.com/sharktype/satchel/db"
+	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/db"
 )
 
@@ -20,14 +20,14 @@ func NewManager(client db.Client) *Manager {
 	return &Manager{DB: client}
 }
 
-func (m *Manager) RequireUser(ctx context.Context, sub string) (sqlc.User, error) {
+func (m *Manager) RequireUser(ctx context.Context, sub string) (generated.User, error) {
 	row, err := m.DB.GetUserBySub(ctx, sub)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return sqlc.User{}, ErrUserNotProvisioned
+		return generated.User{}, ErrUserNotProvisioned
 	}
 
 	if err != nil {
-		return sqlc.User{}, fmt.Errorf("failed to look up user %q: %w", sub, err)
+		return generated.User{}, fmt.Errorf("failed to look up user %q: %w", sub, err)
 	}
 
 	return row.User, nil
