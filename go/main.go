@@ -31,6 +31,7 @@ func main() {
 
 	logger := logger.MustNew()
 	cfg := config.MustNew(logger)
+
 	appClients := clients.MustNew(ctx, logger, cfg.Clients.DB.Driver, cfg.Clients.DB.DSN)
 
 	cli := humacli.New(func(hooks humacli.Hooks, options *Options) {
