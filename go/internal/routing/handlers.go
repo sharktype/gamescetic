@@ -14,6 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	requestTimeout   = 60 * time.Second
+	compressionLevel = 5
+)
+
 func MustNewAPI(
 	r chi.Router,
 	humaConfig huma.Config,
@@ -49,8 +54,8 @@ func MustNewRouter(
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)
 	router.Use(middleware.GetHead)
-	router.Use(middleware.Timeout(60 * time.Second))
-	router.Use(middleware.Compress(5))
+	router.Use(middleware.Timeout(requestTimeout))
+	router.Use(middleware.Compress(compressionLevel))
 	router.Use(middleware.Heartbeat("/ping"))
 	router.Use(http.MustNewCORSHandler(
 		allowedOrigins,

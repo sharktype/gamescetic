@@ -19,7 +19,7 @@ const readTimeout = 30 * time.Second
 // WriteTimeout has to outlast the router's own middleware.Timeout to ensure the response is fully
 // written before the middleware times out.
 
-const writeHeaderTimeout = 10 * time.Second
+const writeTimeout = 70 * time.Second
 const idleTimeout = 120 * time.Second
 
 type Options struct {
@@ -61,7 +61,7 @@ func main() {
 			Handler:           router,
 			ReadHeaderTimeout: readHeaderTimeout,
 			ReadTimeout:       readTimeout,
-			WriteTimeout:      writeHeaderTimeout,
+			WriteTimeout:      writeTimeout,
 			IdleTimeout:       idleTimeout,
 		}
 
