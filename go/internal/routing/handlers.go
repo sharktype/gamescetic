@@ -42,11 +42,15 @@ func MustNewAPI(
 func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router := chi.NewMux()
 
-	// We don't use middleware.RealIP since it rewrites RemoteAddr from the client and can be
-	// attacker-controlled to bypass rate limits or other IP restrictions.
+	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
+	// directly reachable. Otherwise, RealIP would trust the given client-controlled IP address.
+	//
+	// This is fine for self-hosted configurations most of the time since either the API would be
+	// deployed via a reverse proxy with TLS, or the API is only used by trusted clients.
 
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)

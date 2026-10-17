@@ -164,4 +164,34 @@ func TestMustNewRouter(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusTooManyRequests)
 		}
 	})
+
+	t.Run("the global limiter is per client behind the proxy", func(t *testing.T) {
+		router := testRouter(t)
+
+		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
+
+		request := func(forwardedFor string) int {
+			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			request.Header.Set("X-Forwarded-For", forwardedFor)
+
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+
+			return response.Code
+		}
+
+		for i := 0; i < globalRateLimit; i++ {
+			if code := request("1.0.0.1"); code != http.StatusOK {
+				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
+			}
+		}
+
+		if code := request("1.0.0.1"); code != http.StatusTooManyRequests {
+			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
+		}
+
+		if code := request("1.0.0.2"); code != http.StatusOK {
+			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
+		}
+	})
 }
