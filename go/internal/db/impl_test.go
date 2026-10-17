@@ -5,55 +5,98 @@ import (
 	"strings"
 	"testing"
 
-	"go.uber.org/zap"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	sqlc "github.com/sharktype/satchel/db"
 )
 
-func TestNew(t *testing.T) {
-	// These strings are up here to workaround a Zed issue where syntax highlighting goes wonky.
+const testDatabaseName = "testing"
 
-	const postgresConnectString = "postgres://localhost:5432/test"
-	const mysqlConnectString = "mysql://localhost:3306/test"
+type TestClient struct {
+	*store
 
-	// Note that this test does not actually connect to the database.
+	// pool is the connection pool for the testing database, used for cleanup.
+	pool *pgxpool.Pool
+}
 
-	tests := []struct {
-		name        string
-		config      *Config
-		expectedErr string
-	}{
-		{
-			name:        "no config",
-			config:      nil,
-			expectedErr: "database connection is required",
-		},
-		{
-			name:        "missing driver",
-			config:      &Config{DSN: new(postgresConnectString)},
-			expectedErr: "database connection is required",
-		},
-		{
-			name:        "missing dsn",
-			config:      &Config{Driver: new("postgres")},
-			expectedErr: "database connection is required",
-		},
-		{
-			name:        "unsupported driver",
-			config:      &Config{Driver: new("mysql"), DSN: new(mysqlConnectString)},
-			expectedErr: "unsupported database driver: mysql",
-		},
+func NewTestClient(t testing.TB, dsn string) *TestClient {
+	t.Helper()
+
+	config, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			client, err := New(context.Background(), test.config, zap.NewNop())
+	config.ConnConfig.Database = testDatabaseName
 
-			if client != nil {
-				t.Fatal("expected no client")
-			}
-
-			if err == nil || !strings.Contains(err.Error(), test.expectedErr) {
-				t.Fatalf("got error %v, want it to contain %q", err, test.expectedErr)
-			}
-		})
+	pool, err := pgxpool.NewWithConfig(t.Context(), config)
+	if err != nil {
+		t.Fatal(err)
 	}
+
+	if err := pool.Ping(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+
+	database := &TestClient{
+		store: &store{
+			Queries: sqlc.New(pool),
+			db:      pool,
+		},
+		pool: pool,
+	}
+
+	t.Cleanup(func() {
+		if err := database.Cleanup(context.Background()); err != nil {
+			t.Errorf("cleanup testing database: %v", err)
+		}
+
+		pool.Close()
+	})
+
+	return database
+}
+
+// Cleanup truncates every table in the public schema, leaving goose's bookkeeping alone.
+func (c *TestClient) Cleanup(ctx context.Context) error {
+	rows, err := c.pool.Query(ctx, `
+		SELECT tablename
+		FROM pg_tables
+		WHERE schemaname = 'public' AND tablename <> 'goose_db_version'
+		ORDER BY tablename
+	`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var tables []string
+
+	for rows.Next() {
+		var table string
+		if err := rows.Scan(&table); err != nil {
+			return err
+		}
+
+		tables = append(tables, table)
+	}
+
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	if len(tables) == 0 {
+		return nil
+	}
+
+	identifiers := make([]string, len(tables))
+	for i, table := range tables {
+		identifiers[i] = pgx.Identifier{table}.Sanitize()
+	}
+
+	_, err = c.pool.Exec(
+		ctx, "TRUNCATE TABLE "+strings.Join(identifiers, ", ")+" RESTART IDENTITY CASCADE",
+	)
+
+	return err
 }
