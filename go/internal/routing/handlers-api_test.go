@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db"
@@ -220,6 +222,49 @@ func TestMustNewRouter(t *testing.T) {
 
 		if code := request("1.0.0.2"); code != http.StatusOK {
 			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
+		}
+	})
+}
+
+func TestLimitByRoute(t *testing.T) {
+	t.Run("limits by route pattern rather than URL path", func(t *testing.T) {
+		router := chi.NewMux()
+
+		router.Group(func(r chi.Router) {
+			r.Use(limitByRoute(map[string]func(http.Handler) http.Handler{
+				"/things/{id}": httprate.Limit(2, rateLimitWindow),
+			}))
+
+			r.Get("/things/{id}", func(writer http.ResponseWriter, _ *http.Request) {
+				writer.WriteHeader(http.StatusOK)
+			})
+
+			r.Get("/other", func(writer http.ResponseWriter, _ *http.Request) {
+				writer.WriteHeader(http.StatusOK)
+			})
+		})
+
+		send := func(path string) int {
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, path, nil))
+
+			return response.Code
+		}
+
+		for _, id := range []string{"a", "b"} {
+			if code := send("/things/" + id); code != http.StatusOK {
+				t.Fatalf("%s: got %d, want %d", id, code, http.StatusOK)
+			}
+		}
+
+		if code := send("/things/c"); code != http.StatusTooManyRequests {
+			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
+		}
+
+		// A route that is not listed falls through to whatever the router already applied.
+
+		if code := send("/other"); code != http.StatusOK {
+			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 	})
 }

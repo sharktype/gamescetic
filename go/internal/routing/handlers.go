@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -19,8 +20,10 @@ const (
 	requestTimeout   = 60 * time.Second
 	compressionLevel = 5
 
-	globalRateLimit = 100
-	rateLimitWindow = time.Minute
+	globalRateLimit  = 120
+	publicRateLimit  = 30
+	securedRateLimit = 60
+	rateLimitWindow  = time.Minute
 )
 
 func MustNewAPI(
@@ -66,4 +69,27 @@ func MustNewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router.Use(middleware.Heartbeat("/ping"))
 
 	return router
+}
+
+// limitByRoute applies a separate rate limiter per route pattern.
+func limitByRoute(
+	limiters map[string]func(http.Handler) http.Handler,
+) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		wrapped := make(map[string]http.Handler, len(limiters))
+		for pattern, limiter := range limiters {
+			wrapped[pattern] = limiter(next)
+		}
+
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			handler, ok := wrapped[chi.RouteContext(request.Context()).RoutePattern()]
+			if !ok {
+				next.ServeHTTP(writer, request)
+
+				return
+			}
+
+			handler.ServeHTTP(writer, request)
+		})
+	}
 }

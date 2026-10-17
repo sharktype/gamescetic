@@ -56,53 +56,25 @@ func handle(
 		return err
 	}
 
-	// Group 1 (rate limit 50 /min). Also, remember global rate limiting is 100 /min (middleware).
-
 	r.Group(func(r chi.Router) {
-		r.Use(httprate.Limit(
-			50,
-			rateLimitWindow,
-			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
-		))
-
-		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
-
-		op := huma.Operation{
+		healthOp := huma.Operation{
 			OperationID: "GetHealth",
 			Summary:     "Get Health",
 			Method:      http.MethodGet,
 			Path:        "/health",
 		}
-		huma.Register(api, op, withErrorLogging(logger, op, health.GetHealth))
-	})
 
-	// Group 2 (rate limit 30 /min).
-
-	r.Group(func(r chi.Router) {
-		r.Use(httprate.Limit(
-			30,
-			rateLimitWindow,
-			httprate.WithKeyFuncs(httprate.KeyByIP, httprate.KeyByEndpoint),
-		))
-
-		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
-
-		if clients.DB != nil {
-			op := huma.Operation{
-				OperationID: "GetDatabaseHealth",
-				Summary:     "Get Database Health",
-				Method:      http.MethodGet,
-				Path:        "/health/db",
-				Security: []map[string][]string{
-					{auth.DefaultJWTSchemeKey: {}},
-				},
-			}
-			huma.Register(
-				api, op, withErrorLogging(logger, op, health.GetDatabaseHealth(logger, clients)),
-			)
+		databaseOp := huma.Operation{
+			OperationID: "GetDatabaseHealth",
+			Summary:     "Get Database Health",
+			Method:      http.MethodGet,
+			Path:        "/health/db",
+			Security: []map[string][]string{
+				{auth.DefaultJWTSchemeKey: {}},
+			},
 		}
 
-		op := huma.Operation{
+		authOp := huma.Operation{
 			OperationID: "GetAuthHealth",
 			Summary:     "Get Auth Health",
 			Method:      http.MethodGet,
@@ -111,9 +83,8 @@ func handle(
 				{auth.DefaultJWTSchemeKey: {}},
 			},
 		}
-		huma.Register(api, op, withErrorLogging(logger, op, health.GetAuthHealth))
 
-		op = huma.Operation{
+		errorOp := huma.Operation{
 			OperationID: "GetErrorHealth",
 			Summary:     "Get Error Health",
 			Method:      http.MethodGet,
@@ -122,7 +93,24 @@ func handle(
 				{auth.DefaultJWTSchemeKey: {}},
 			},
 		}
-		huma.Register(api, op, withErrorLogging(logger, op, health.GetErrorHealth))
+
+		r.Use(limitByRoute(map[string]func(http.Handler) http.Handler{
+			healthOp.Path:   httprate.Limit(publicRateLimit, rateLimitWindow),
+			databaseOp.Path: httprate.Limit(securedRateLimit, rateLimitWindow),
+			authOp.Path:     httprate.Limit(securedRateLimit, rateLimitWindow),
+			errorOp.Path:    httprate.Limit(securedRateLimit, rateLimitWindow),
+		}))
+
+		api := MustNewAPI(r, humaConfig, jwtCache, authConfig, clients, logger)
+
+		huma.Register(api, healthOp, withErrorLogging(logger, healthOp, health.GetHealth))
+		huma.Register(
+			api,
+			databaseOp,
+			withErrorLogging(logger, databaseOp, health.GetDatabaseHealth(logger, clients)),
+		)
+		huma.Register(api, authOp, withErrorLogging(logger, authOp, health.GetAuthHealth))
+		huma.Register(api, errorOp, withErrorLogging(logger, errorOp, health.GetErrorHealth))
 	})
 
 	return nil
