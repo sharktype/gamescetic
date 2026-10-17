@@ -22,7 +22,7 @@ func TestExecTx(t *testing.T) {
 
 		err := database.ExecTx(t.Context(), func(tx db.Client) error {
 			return tx.SetMeta(t.Context(), sqlc.SetMetaParams{
-				Key:   "meta-1",
+				Key:   "key-1",
 				Value: "value-1",
 			})
 		})
@@ -30,7 +30,7 @@ func TestExecTx(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		value, err := database.GetMeta(t.Context(), "meta-1")
+		value, err := database.GetMeta(t.Context(), "key-1")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -47,7 +47,7 @@ func TestExecTx(t *testing.T) {
 
 		err := database.ExecTx(t.Context(), func(tx db.Client) error {
 			if err := tx.SetMeta(t.Context(), sqlc.SetMetaParams{
-				Key:   "meta-1",
+				Key:   "key-1",
 				Value: "value-1",
 			}); err != nil {
 				return err
@@ -59,7 +59,7 @@ func TestExecTx(t *testing.T) {
 			t.Fatalf("got error %v, want %v", err, expectedErr)
 		}
 
-		if _, err := database.GetMeta(t.Context(), "meta-1"); !errors.Is(err, pgx.ErrNoRows) {
+		if _, err := database.GetMeta(t.Context(), "key-1"); !errors.Is(err, pgx.ErrNoRows) {
 			t.Fatalf("got error %v, want %v", err, pgx.ErrNoRows)
 		}
 	})
@@ -78,7 +78,7 @@ func TestExecTx(t *testing.T) {
 				}
 
 				return inner.SetMeta(t.Context(), sqlc.SetMetaParams{
-					Key:   "meta-1",
+					Key:   "key-1",
 					Value: "value-1",
 				})
 			})
@@ -87,7 +87,7 @@ func TestExecTx(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if _, err := database.GetMeta(t.Context(), "meta-1"); err != nil {
+		if _, err := database.GetMeta(t.Context(), "key-1"); err != nil {
 			t.Fatalf("expected the nested write to be committed: %v", err)
 		}
 	})

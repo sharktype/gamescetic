@@ -11,6 +11,8 @@ import (
 )
 
 func TestRequireUser(t *testing.T) {
+	arbitraryErr := errors.New("arbitrary error")
+
 	tests := []struct {
 		name        string
 		row         []any
@@ -20,7 +22,7 @@ func TestRequireUser(t *testing.T) {
 	}{
 		{
 			name:       "provisioned user",
-			row:        []any{"user-1", "sub-1", "Ada", "ada@example.com", nil, time.Now(), nil},
+			row:        []any{"user-1", "sub-1", "Ada", "ada@lovelace.com", nil, time.Now(), nil},
 			expectedID: "user-1",
 		},
 		{
@@ -30,8 +32,8 @@ func TestRequireUser(t *testing.T) {
 		},
 		{
 			name:        "lookup failure",
-			queryErr:    errors.New("arbitrary error"),
-			expectedErr: errors.New("arbitrary error"),
+			queryErr:    arbitraryErr,
+			expectedErr: arbitraryErr,
 		},
 	}
 

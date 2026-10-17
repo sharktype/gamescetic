@@ -12,10 +12,10 @@ func setRequiredEnv(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("CLIENTS_DB_DRIVER", "postgres")
-	t.Setenv("CLIENTS_DB_DSN", "postgres://localhost:5432/satchel")
+	t.Setenv("CLIENTS_DB_DSN", "postgres://localhost:5432/foobar")
 	t.Setenv("AUTH_JWKSURL", "https://example.com/jwks")
 	t.Setenv("AUTH_ISSUER", "https://example.com")
-	t.Setenv("AUTH_AUDIENCE", "satchel")
+	t.Setenv("AUTH_AUDIENCE", "foobar")
 	t.Setenv("CORS_ALLOWED_ORIGINS", "http://example.com,https://example.com")
 	t.Setenv("CORS_ALLOWED_METHODS", "GET,POST")
 	t.Setenv("CORS_ALLOWED_HEADERS", "Authorization,Content-Type")
@@ -36,8 +36,8 @@ func TestNewConfig(t *testing.T) {
 		t.Fatalf("got driver %q, want %q", cfg.Clients.DB.Driver, "postgres")
 	}
 
-	if cfg.Clients.DB.DSN != "postgres://localhost:5432/satchel" {
-		t.Fatalf("got dsn %q, want %q", cfg.Clients.DB.DSN, "postgres://localhost:5432/satchel")
+	if cfg.Clients.DB.DSN != "postgres://localhost:5432/foobar" {
+		t.Fatalf("got DSN %q, want %q", cfg.Clients.DB.DSN, "postgres://localhost:5432/foobar")
 	}
 
 	if cfg.Auth.JWKSURL != "https://example.com/jwks" {
