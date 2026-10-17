@@ -54,7 +54,14 @@ func newRouter(config cors.Config) (*chi.Mux, error) {
 	router.Use(middleware.Timeout(60 * time.Second))
 	router.Use(middleware.Compress(5))
 	router.Use(middleware.Heartbeat("/ping"))
-	router.Use(corsHandler)
+	router.Use(http.MustNewCORSHandler(
+		allowedOrigins,
+		allowedMethods,
+		allowedHeaders,
+		exposedHeaders,
+		allowCredentials,
+		maxAge,
+	))
 
 	return router, nil
 }

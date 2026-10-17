@@ -7,17 +7,12 @@ import (
 	"go.uber.org/zap"
 )
 
-type (
-	Driver string
-	DSN    string
-)
-
 type Clients struct {
 	DB db.Client
 }
 
-func MustNew(ctx context.Context, logger *zap.Logger, driver Driver, dsn DSN) *Clients {
-	return &Clients{DB: db.MustNew(db.MustNewPool(ctx, string(driver), string(dsn), logger))}
+func MustNew(ctx context.Context, logger *zap.Logger, driver, dsn string) *Clients {
+	return &Clients{DB: db.MustNew(db.MustNewPool(ctx, logger, db.Driver(driver), db.DSN(dsn)))}
 }
 
 func NewStubs() *Clients {
