@@ -35,5 +35,6 @@ func New(
 }
 
 func (c *Clients) Close() {
+	c.Auth.Close()
 	c.DB.Close()
 }

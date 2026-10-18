@@ -15,30 +15,54 @@ const jwksMinInterval = 10 * time.Minute
 
 // Client verifies tokens against the IDP's published keys and resolves the caller to a user.
 type Client struct {
-	cache  *jwk.Cache
+	cache *jwk.Cache
+
 	db     db.Client
-	cfg    Config
 	logger *zap.Logger
+	cfg    Config
+
+	cancel context.CancelFunc
 }
 
 func New(ctx context.Context, db db.Client, logger *zap.Logger, cfg Config) (*Client, error) {
-	cache, err := jwk.NewCache(ctx, httprc.NewClient())
+	cacheCtx, cancelCache := context.WithCancel(ctx)
+
+	cache, err := jwk.NewCache(cacheCtx, httprc.NewClient())
 	if err != nil {
+		cancelCache()
+
 		return nil, fmt.Errorf("failed to create jwk cache: %w", err)
 	}
 
-	err = cache.Register(ctx, cfg.JWKSURL, jwk.WithMinInterval(jwksMinInterval))
+	err = cache.Register(cacheCtx, cfg.JWKSURL, jwk.WithMinInterval(jwksMinInterval))
 	if err != nil {
+		cancelCache()
+
 		return nil, fmt.Errorf("failed to register jwk location: %w", err)
 	}
 
-	fetchCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
+	fetchCtx, cancelFetch := context.WithTimeout(cacheCtx, 10*time.Second)
+	defer cancelFetch()
 
 	_, err = cache.Refresh(fetchCtx, cfg.JWKSURL)
 	if err != nil {
+		cancelCache()
+
 		return nil, fmt.Errorf("failed to fetch on startup: %w", err)
 	}
 
-	return &Client{cache: cache, cfg: cfg, db: db, logger: logger}, nil
+	return &Client{
+		cache:  cache,
+		cancel: cancelCache,
+		cfg:    cfg,
+		db:     db,
+		logger: logger,
+	}, nil
+}
+
+// Close stops background key refreshes.
+//
+// Should only be called after in-flight requests have drained.
+func (c *Client) Close() {
+	c.cancel()
 }

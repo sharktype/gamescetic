@@ -39,13 +39,6 @@ func main() {
 }
 
 func run() error {
-	// Some background goroutines such as the JWT key cache are still needed to finish serving
-	// requests in-flight when the server is told to stop. As a result, we use appCtx to manage
-	// them and only cancel it after all requests are done.
-
-	appCtx, cancelApp := context.WithCancel(context.Background())
-	defer cancelApp()
-
 	// Load config and logger:
 
 	cfg, err := config.New()
@@ -71,7 +64,7 @@ func run() error {
 	}
 
 	appClients, err := clients.New(
-		appCtx,
+		context.Background(),
 		logger,
 		db.Config{DSN: cfg.Clients.DB.DSN},
 		auth.Config{
