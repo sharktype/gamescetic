@@ -1,8 +1,8 @@
 package auth
 
 import (
-	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -25,14 +25,24 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			neededScopes = requirements[0]
 		}
 
-		token, sub, ok := verifiedToken(ctx, c.cache, c.cfg)
-		if !ok {
+		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
+		if err != nil {
+			c.logger.Error("could not load JWT signing keys", zap.Error(err))
+			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
+
+			return
+		}
+
+		token, sub, err := verifiedToken(ctx.Header("Authorization"), keySet, c.cfg)
+		if err != nil {
+			c.logger.Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
 		}
 
 		if !hasAllScopes(token, neededScopes) {
+			c.logger.Debug("token lacks required scopes", zap.String("sub", sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
@@ -72,44 +82,28 @@ func JWTRequirements(operation *huma.Operation) [][]string {
 	return requirements
 }
 
-func verifiedToken(ctx huma.Context, cache *jwk.Cache, cfg Config) (jwt.Token, string, bool) {
-	raw, ok := bearerToken(ctx.Header("Authorization"))
-	if !ok {
-		return nil, "", false
-	}
-
-	token, err := parseToken(ctx.Context(), cache, cfg, raw)
+func verifiedToken(authorization string, keySet jwk.Set, cfg Config) (jwt.Token, string, error) {
+	raw, err := bearerToken(authorization)
 	if err != nil {
-		return nil, "", false
+		return nil, "", err
 	}
 
-	sub, ok := token.Subject()
-	if !ok || sub == "" {
-		return nil, "", false
-	}
-
-	return token, sub, true
-}
-
-func parseToken(
-	ctx context.Context,
-	cache *jwk.Cache,
-	cfg Config,
-	token string,
-) (jwt.Token, error) {
-	keySet, err := cache.Lookup(ctx, cfg.JWKSURL)
-	if err != nil {
-		return nil, err
-	}
-
-	// A lot of providers omit the signing algorithm, but it can be inferred from the key type.
-
-	return jwt.ParseString(token,
+	token, err := jwt.ParseString(raw,
 		jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
 		jwt.WithValidate(true),
 		jwt.WithIssuer(cfg.Issuer),
 		jwt.WithAudience(cfg.Audience),
 	)
+	if err != nil {
+		return nil, "", fmt.Errorf("invalid token: %w", err)
+	}
+
+	sub, ok := token.Subject()
+	if !ok || sub == "" {
+		return nil, "", errors.New("token has no subject")
+	}
+
+	return token, sub, nil
 }
 
 func hasAllScopes(token jwt.Token, wanted []string) bool {
@@ -133,17 +127,17 @@ func grantedScopes(token jwt.Token) []string {
 	return strings.Fields(scope)
 }
 
-func bearerToken(header string) (string, bool) {
+func bearerToken(header string) (string, error) {
 	const prefix = "Bearer "
 
 	if len(header) < len(prefix) || !strings.EqualFold(header[:len(prefix)], prefix) {
-		return "", false
+		return "", errors.New("authorization header is not a bearer token")
 	}
 
 	token := strings.TrimSpace(header[len(prefix):])
 	if token == "" {
-		return "", false
+		return "", errors.New("bearer token is empty")
 	}
 
-	return token, true
+	return token, nil
 }
