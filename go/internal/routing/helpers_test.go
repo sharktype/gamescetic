@@ -30,7 +30,14 @@ func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
 	return &clients.Clients{DB: users, Auth: authClient.Client}, authClient
 }
 
-func newTestAPI(t *testing.T) (chi.Router, *huma.Group, *huma.Group, *authtest.Client) {
+type testAPI struct {
+	router  chi.Router
+	public  *huma.Group
+	secured *huma.Group
+	client  *authtest.Client
+}
+
+func newTestAPI(t *testing.T) testAPI {
 	t.Helper()
 
 	appClients, authClient := provisionedClients(t)
@@ -40,7 +47,7 @@ func newTestAPI(t *testing.T) (chi.Router, *huma.Group, *huma.Group, *authtest.C
 		router, huma.DefaultConfig("test", "0.0.0"), appClients.Auth,
 	)
 
-	return router, public, secured, authClient
+	return testAPI{router: router, public: public, secured: secured, client: authClient}
 }
 
 func testRouter(t *testing.T) *chi.Mux {

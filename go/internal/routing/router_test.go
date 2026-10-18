@@ -17,15 +17,15 @@ import (
 func TestNewAPI(t *testing.T) {
 
 	t.Run("an unsecured operation never validates a token", func(t *testing.T) {
-		router, public, _, _ := newTestAPI(t)
-		handler := authtest.RegisterProbe(public, nil)
+		api := newTestAPI(t)
+		handler := authtest.RegisterProbe(api.public, nil)
 
 		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
 		claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"sub-1"}`))
 
 		forged := header + "." + claims + ".no-signature"
 
-		code := get(router, authtest.ProbePath, "Bearer "+forged).Code
+		code := get(api.router, authtest.ProbePath, "Bearer "+forged).Code
 		if code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
@@ -36,7 +36,7 @@ func TestNewAPI(t *testing.T) {
 	})
 
 	t.Run("the public group refuses an operation declaring a JWT requirement", func(t *testing.T) {
-		_, public, _, _ := newTestAPI(t)
+		api := newTestAPI(t)
 
 		defer func() {
 			if recover() == nil {
@@ -44,11 +44,11 @@ func TestNewAPI(t *testing.T) {
 			}
 		}()
 
-		authtest.RegisterProbe(public, authtest.RequireJWT())
+		authtest.RegisterProbe(api.public, authtest.RequireJWT())
 	})
 
 	t.Run("the secured group refuses an operation declaring two JWT requirements", func(t *testing.T) {
-		_, _, secured, _ := newTestAPI(t)
+		api := newTestAPI(t)
 
 		defer func() {
 			if recover() == nil {
@@ -57,14 +57,14 @@ func TestNewAPI(t *testing.T) {
 		}()
 
 		security := append(authtest.RequireJWT(), authtest.RequireJWT()...)
-		authtest.RegisterProbe(secured, security)
+		authtest.RegisterProbe(api.secured, security)
 	})
 
 	t.Run("the secured group keeps scopes and documents one JWT requirement", func(t *testing.T) {
-		router, _, secured, authClient := newTestAPI(t)
-		handler := authtest.RegisterProbe(secured, authtest.RequireJWT("posts:read"))
+		api := newTestAPI(t)
+		handler := authtest.RegisterProbe(api.secured, authtest.RequireJWT("posts:read"))
 
-		code := get(router, authtest.ProbePath, "Bearer "+authClient.Token(t, "sub-1")).Code
+		code := get(api.router, authtest.ProbePath, "Bearer "+api.client.Token(t, "sub-1")).Code
 		if code != http.StatusForbidden {
 			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
 		}
@@ -73,12 +73,12 @@ func TestNewAPI(t *testing.T) {
 			t.Fatal("the handler ran")
 		}
 
-		security := secured.OpenAPI().Paths[authtest.ProbePath].Get.Security
+		security := api.secured.OpenAPI().Paths[authtest.ProbePath].Get.Security
 		if len(security) != 1 {
 			t.Fatalf("got %d documented security requirements, want 1", len(security))
 		}
 
-		if _, ok := secured.OpenAPI().Components.SecuritySchemes[auth.JWTSchemeKey]; !ok {
+		if _, ok := api.secured.OpenAPI().Components.SecuritySchemes[auth.JWTSchemeKey]; !ok {
 			t.Fatal("the API does not document the JWT security scheme")
 		}
 	})
@@ -98,11 +98,11 @@ func TestNewAPI(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			router, _, secured, _ := newTestAPI(t)
-			handler := authtest.RegisterProbe(secured, nil)
+			api := newTestAPI(t)
+			handler := authtest.RegisterProbe(api.secured, nil)
 
 			if code := get(
-				router, authtest.ProbePath, test.authorization,
+				api.router, authtest.ProbePath, test.authorization,
 			).Code; code != http.StatusUnauthorized {
 				t.Fatalf("got %d, want %d", code, http.StatusUnauthorized)
 			}
@@ -182,9 +182,9 @@ type thingInput struct {
 
 func TestRateLimit(t *testing.T) {
 	t.Run("limits by operation rather than URL path", func(t *testing.T) {
-		router, public, _, _ := newTestAPI(t)
+		api := newTestAPI(t)
 
-		huma.Register(public, huma.Operation{
+		huma.Register(api.public, huma.Operation{
 			OperationID: "GetThing",
 			Method:      http.MethodGet,
 			Path:        "/things/{id}",
@@ -193,23 +193,23 @@ func TestRateLimit(t *testing.T) {
 		})
 
 		for i := range publicRateLimit {
-			code := get(router, "/things/"+strconv.Itoa(i), "").Code
+			code := get(api.router, "/things/"+strconv.Itoa(i), "").Code
 			if code == http.StatusTooManyRequests {
 				t.Fatalf("request %d was throttled", i+1)
 			}
 		}
 
-		if code := get(router, "/things/other", "").Code; code != http.StatusTooManyRequests {
+		if code := get(api.router, "/things/other", "").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 	})
 
 	t.Run("hitting the limit on one operation does not block another", func(t *testing.T) {
-		router, public, _, _ := newTestAPI(t)
+		api := newTestAPI(t)
 
-		authtest.RegisterProbe(public, nil)
+		authtest.RegisterProbe(api.public, nil)
 
-		huma.Register(public, huma.Operation{
+		huma.Register(api.public, huma.Operation{
 			OperationID: "GetThing",
 			Method:      http.MethodGet,
 			Path:        "/things/{id}",
@@ -218,10 +218,10 @@ func TestRateLimit(t *testing.T) {
 		})
 
 		for range publicRateLimit {
-			get(router, authtest.ProbePath, "")
+			get(api.router, authtest.ProbePath, "")
 		}
 
-		if code := get(router, "/things/a", "").Code; code == http.StatusTooManyRequests {
+		if code := get(api.router, "/things/a", "").Code; code == http.StatusTooManyRequests {
 			t.Fatal("exhausting one operation also exhausted another in the same group")
 		}
 	})
