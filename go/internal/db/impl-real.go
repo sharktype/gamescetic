@@ -12,19 +12,14 @@ import (
 // store implements the Client interface.
 type store struct {
 	*generated.Queries
-	db   pool
+	pool *pgxpool.Pool
 	inTx bool
-}
-
-type pool interface {
-	BeginTx(context.Context, pgx.TxOptions) (pgx.Tx, error)
-	Ping(context.Context) error
 }
 
 func New(pool *pgxpool.Pool) Client {
 	return &store{
 		Queries: generated.New(pool),
-		db:      pool,
+		pool:    pool,
 	}
 }
 
@@ -32,8 +27,12 @@ func (s *store) IsTx() bool {
 	return s.inTx
 }
 
+func (s *store) Close() {
+	s.pool.Close()
+}
+
 func (s *store) Ping(ctx context.Context) error {
-	return s.db.Ping(ctx)
+	return s.pool.Ping(ctx)
 }
 
 func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {
@@ -41,7 +40,7 @@ func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {
 		return fn(s)
 	}
 
-	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
@@ -55,7 +54,7 @@ func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {
 
 	txClient := &store{
 		Queries: s.WithTx(tx),
-		db:      s.db,
+		pool:    s.pool,
 		inTx:    true,
 	}
 

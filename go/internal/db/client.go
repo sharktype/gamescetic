@@ -14,4 +14,5 @@ type Client interface {
 	IsTx() bool
 	ExecTx(context.Context, func(Client) error) error
 	Ping(context.Context) error
+	Close()
 }

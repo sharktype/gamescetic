@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
@@ -13,8 +12,6 @@ import (
 type Clients struct {
 	DB   db.Client
 	Auth *auth.Client
-
-	pool *pgxpool.Pool
 }
 
 func New(
@@ -29,14 +26,14 @@ func New(
 
 	authClient, err := auth.New(ctx, database, logger, authCfg)
 	if err != nil {
-		pool.Close()
+		database.Close()
 
 		return nil, fmt.Errorf("failed to create auth client: %w", err)
 	}
 
-	return &Clients{DB: database, Auth: authClient, pool: pool}, nil
+	return &Clients{DB: database, Auth: authClient}, nil
 }
 
 func (c *Clients) Close() {
-	c.pool.Close()
+	c.DB.Close()
 }
