@@ -8,26 +8,18 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
 )
 
 const (
 	requestTimeout   = 60 * time.Second
-	compressionLevel = 5
-
-	globalRateLimit  = 120
 	publicRateLimit  = 30
 	securedRateLimit = 60
-	rateLimitWindow  = time.Minute
+	compressionLevel = 5
 )
 
-// NewAPI returns the groups every operation must be registered on.
-//
-// Rate limiting must run before the JWT check such that requests with an invalid token still
-// count towards the limit. Huma runs anything attached to the API before anything attached to a
-// group, so the rate limiter and the JWT check are both attached to each group, in that order.
+// NewAPI returns the groups on which every operation must be registered.
 func NewAPI(
 	r chi.Router, humaConfig huma.Config, authClient *auth.Client,
 ) (public *huma.Group, secured *huma.Group) {
@@ -47,14 +39,16 @@ func NewAPI(
 
 	secured = huma.NewGroup(api)
 	secured.UseSimpleModifier(declareJWT)
-	secured.UseMiddleware(
-		rateLimit(securedRateLimit),
-		authClient.Middleware(api),
-	)
+	secured.UseMiddleware(rateLimit(securedRateLimit), authClient.Middleware(api))
 
 	return public, secured
 }
 
+// NewRouter returns the transport-level handler.
+//
+// Every request passes through this router, including ones huma/the API never sees, such as /ping.
+//
+// Middleware here apply to _all_ traffic, and middleware in the API groups are layered on top.
 func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router := chi.NewMux()
 
@@ -78,25 +72,10 @@ func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 
 	// Counts per replica so remember to keep volumetric throttling at the edge too.
 
-	router.Use(httprate.LimitByIP(globalRateLimit, rateLimitWindow))
+	router.Use(rateLimitGlobally)
 	router.Use(middleware.Heartbeat("/ping"))
 
 	return router
-}
-
-func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
-	limiter := httprate.NewRateLimiter(limit, rateLimitWindow)
-
-	return func(ctx huma.Context, next func(huma.Context)) {
-		request, writer := humachi.Unwrap(ctx)
-
-		ip, _ := httprate.KeyByIP(request)
-		if limiter.RespondOnLimit(writer, request, ip+" "+ctx.Operation().OperationID) {
-			return
-		}
-
-		next(ctx)
-	}
 }
 
 // declareJWT marks every operation on the secured group as requiring a JWT token.
@@ -111,28 +90,29 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 // prefix or this JWT requirement, must apply to both, or the spec would not match how the server
 // behaves. Huma cannot tell which changes matter to which, so it runs declareJWT for both.
 func declareJWT(operation *huma.Operation) {
-	if !declaresJWT(operation) {
+	switch requirements := auth.JWTRequirements(operation); len(requirements) {
+	case 0:
+		// Just needs auth, doesn't care about scopes:
+
 		operation.Security = append(
 			operation.Security, map[string][]string{auth.JWTSchemeKey: {}},
 		)
+	case 1:
+		// break
+	default:
+		panic(fmt.Sprintf(
+			"operation %q declares %d JWT security requirements; at most one is supported",
+			operation.OperationID,
+			len(requirements),
+		))
 	}
 }
 
 func mustNotDeclareJWT(operation *huma.Operation) {
-	if declaresJWT(operation) {
+	if len(auth.JWTRequirements(operation)) > 0 {
 		panic(fmt.Sprintf(
 			"operation %q declares a JWT requirement but is registered on the public group",
 			operation.OperationID,
 		))
 	}
-}
-
-func declaresJWT(operation *huma.Operation) bool {
-	for _, requirement := range operation.Security {
-		if _, ok := requirement[auth.JWTSchemeKey]; ok {
-			return true
-		}
-	}
-
-	return false
 }

@@ -2,28 +2,36 @@ package routing
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 )
 
 func TestNewAPI(t *testing.T) {
 
-	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
+	t.Run("an unsecured operation never validates a token", func(t *testing.T) {
 		router, public, _, _ := newTestAPI(t)
 		handler := authtest.RegisterProbe(public, nil)
 
-		if code := get(router, authtest.ProbePath, "").Code; code != http.StatusOK {
+		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
+		claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"sub-1"}`))
+
+		forged := header + "." + claims + ".no-signature"
+
+		code := get(router, authtest.ProbePath, "Bearer "+forged).Code
+		if code != http.StatusOK {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if !handler.Ran {
-			t.Fatal("the handler did not run")
+		if handler.User != (generated.User{}) {
+			t.Fatalf("got user %+v, want none", handler.User)
 		}
 	})
 
@@ -37,6 +45,19 @@ func TestNewAPI(t *testing.T) {
 		}()
 
 		authtest.RegisterProbe(public, authtest.RequireJWT())
+	})
+
+	t.Run("the secured group refuses an operation declaring two JWT requirements", func(t *testing.T) {
+		_, _, secured, _ := newTestAPI(t)
+
+		defer func() {
+			if recover() == nil {
+				t.Fatal("expected a panic")
+			}
+		}()
+
+		security := append(authtest.RequireJWT(), authtest.RequireJWT()...)
+		authtest.RegisterProbe(secured, security)
 	})
 
 	t.Run("the secured group keeps scopes and documents one JWT requirement", func(t *testing.T) {

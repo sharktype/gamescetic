@@ -3,7 +3,6 @@ package auth
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -20,11 +19,10 @@ const JWTSchemeKey = "JWT"
 
 func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		neededScopes, required := jwtScopes(ctx.Operation())
-		if !required {
-			next(ctx)
+		var neededScopes []string
 
-			return
+		if requirements := JWTRequirements(ctx.Operation()); len(requirements) > 0 {
+			neededScopes = requirements[0]
 		}
 
 		token, sub, ok := verifiedToken(ctx, c.cache, c.cfg)
@@ -61,14 +59,17 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 	}
 }
 
-func jwtScopes(operation *huma.Operation) ([]string, bool) {
+// JWTRequirements returns the scope lists of every security requirement naming the JWT scheme.
+func JWTRequirements(operation *huma.Operation) [][]string {
+	var requirements [][]string
+
 	for _, requirement := range operation.Security {
 		if scopes, ok := requirement[JWTSchemeKey]; ok {
-			return scopes, true
+			requirements = append(requirements, scopes)
 		}
 	}
 
-	return nil, false
+	return requirements
 }
 
 func verifiedToken(ctx huma.Context, cache *jwk.Cache, cfg Config) (jwt.Token, string, bool) {
@@ -88,27 +89,6 @@ func verifiedToken(ctx huma.Context, cache *jwk.Cache, cfg Config) (jwt.Token, s
 	}
 
 	return token, sub, true
-}
-
-// MustSingleJWTRequirement prevents multiple JWT-naming security requirements.
-//
-// This is seen as a configuration error from the developer.
-func MustSingleJWTRequirement(_ *huma.OpenAPI, operation *huma.Operation) {
-	count := 0
-
-	for _, requirement := range operation.Security {
-		if _, ok := requirement[JWTSchemeKey]; ok {
-			count++
-		}
-	}
-
-	if count > 1 {
-		panic(fmt.Sprintf(
-			"operation %q declares %d JWT security requirements; at most one is supported",
-			operation.OperationID,
-			count,
-		))
-	}
 }
 
 func parseToken(

@@ -6,7 +6,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
 	"go.uber.org/zap"
@@ -18,8 +17,6 @@ func Handle(
 	appClients *clients.Clients,
 	humaConfig huma.Config,
 ) error {
-	humaConfig.OnAddOperation = append(humaConfig.OnAddOperation, auth.MustSingleJWTRequirement)
-
 	public, secured := NewAPI(mux, humaConfig, appClients.Auth)
 
 	register(logger, public, huma.Operation{

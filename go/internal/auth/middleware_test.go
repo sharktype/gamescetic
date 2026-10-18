@@ -1,15 +1,12 @@
 package auth_test
 
 import (
-	"encoding/base64"
 	"errors"
 	"net/http"
 	"testing"
 
-	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
@@ -34,25 +31,6 @@ func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Clie
 }
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
-	t.Run("an unsecured operation never resolves a user", func(t *testing.T) {
-		api, _ := newTestAPI(t, &dbtest.Stub{User: provisioned})
-		probe := authtest.RegisterProbe(api, nil)
-
-		header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"HS256"}`))
-		claims := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"sub-1"}`))
-
-		forged := header + "." + claims + ".no-signature"
-
-		code := api.Get(authtest.ProbePath, "Authorization: Bearer "+forged).Code
-		if code != http.StatusOK {
-			t.Fatalf("got %d, want %d", code, http.StatusOK)
-		}
-
-		if probe.User != (generated.User{}) {
-			t.Fatalf("got user %+v, want none", probe.User)
-		}
-	})
-
 	t.Run("a verified token resolves the user by its subject", func(t *testing.T) {
 		api, authClient := newTestAPI(t, &dbtest.Stub{User: provisioned})
 		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
@@ -187,48 +165,6 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			})
 		}
 	})
-}
-
-func TestMustSingleJWTRequirement(t *testing.T) {
-	jwtRequirement := map[string][]string{auth.JWTSchemeKey: {}}
-
-	tests := []struct {
-		name        string
-		security    []map[string][]string
-		expectPanic bool
-	}{
-		{
-			name: "no security",
-		},
-		{
-			name:     "one JWT requirement",
-			security: []map[string][]string{jwtRequirement},
-		},
-		{
-			name:     "one JWT requirement plus another scheme",
-			security: []map[string][]string{jwtRequirement, {"APIKey": {}}},
-		},
-		{
-			name:        "two JWT requirements",
-			security:    []map[string][]string{jwtRequirement, jwtRequirement},
-			expectPanic: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			defer func() {
-				if recovered := recover(); (recovered != nil) != test.expectPanic {
-					t.Fatalf("got panic %v, want panic %t", recovered, test.expectPanic)
-				}
-			}()
-
-			auth.MustSingleJWTRequirement(nil, &huma.Operation{
-				OperationID: "Test",
-				Security:    test.security,
-			})
-		})
-	}
 }
 
 func TestBearerToken(t *testing.T) {
