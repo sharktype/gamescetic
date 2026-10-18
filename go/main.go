@@ -15,7 +15,7 @@ import (
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
-	"github.com/sharktype/satchel/internal/logger"
+	appLogger "github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
 	"go.uber.org/zap"
 )
@@ -52,7 +52,7 @@ func run() error {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	logger, err := logger.New(logger.Config{
+	logger, err := appLogger.New(appLogger.Config{
 		Production: cfg.Production,
 		Verbose:    cfg.Verbose,
 	})
