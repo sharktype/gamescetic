@@ -90,21 +90,20 @@ func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 // prefix or this JWT requirement, must apply to both, or the spec would not match how the server
 // behaves. Huma cannot tell which changes matter to which, so it runs declareJWT for both.
 func declareJWT(operation *huma.Operation) {
-	switch requirements := auth.JWTRequirements(operation); len(requirements) {
-	case 0:
-		// Just needs auth, doesn't care about scopes:
+	requirements := auth.JWTRequirements(operation)
 
-		operation.Security = append(
-			operation.Security, map[string][]string{auth.JWTSchemeKey: {}},
-		)
-	case 1:
-		// break
-	default:
+	if len(requirements) > 1 {
 		panic(fmt.Sprintf(
 			"operation %q declares %d JWT security requirements; at most one is supported",
 			operation.OperationID,
 			len(requirements),
 		))
+	}
+
+	if len(requirements) == 0 {
+		operation.Security = append(
+			operation.Security, map[string][]string{auth.JWTSchemeKey: {}},
+		)
 	}
 }
 
