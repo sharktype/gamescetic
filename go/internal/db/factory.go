@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
@@ -15,11 +16,13 @@ func NewPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool
 
 	pool, err := pgxpool.New(ctx, cfg.DSN)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse database configuration: %w", err)
 	}
 
 	if err := pool.Ping(ctx); err != nil {
-		return nil, err
+		pool.Close()
+
+		return nil, fmt.Errorf("failed to ping database after connection: %w", err)
 	}
 
 	logger.Info("database connection successful", zap.String("driver", driver))

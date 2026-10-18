@@ -52,7 +52,7 @@ func isProduction() (bool, error) {
 func loadDotEnv() error {
 	dir, err := os.Getwd()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	for {

@@ -2,6 +2,7 @@ package clients
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sharktype/satchel/internal/auth"
@@ -21,7 +22,7 @@ func New(
 ) (*Clients, error) {
 	pool, err := db.NewPool(ctx, logger, dbCfg)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to create database client: %w", err)
 	}
 
 	database := db.New(pool)
@@ -30,7 +31,7 @@ func New(
 	if err != nil {
 		pool.Close()
 
-		return nil, err
+		return nil, fmt.Errorf("failed to create auth client: %w", err)
 	}
 
 	return &Clients{DB: database, Auth: authClient, pool: pool}, nil
