@@ -11,6 +11,7 @@ func setRequiredEnv(t *testing.T) {
 	t.Helper()
 
 	t.Setenv("CLIENTS_DB_DSN", "postgres://localhost:5432/foobar")
+	t.Setenv("CLIENTS_DB_TEST_DSN", "postgres://localhost:5432/testing")
 	t.Setenv("AUTH_JWKSURL", "https://example.com/jwks")
 	t.Setenv("AUTH_ISSUER", "https://example.com")
 	t.Setenv("AUTH_AUDIENCE", "foobar")
@@ -35,6 +36,13 @@ func TestNewConfig(t *testing.T) {
 
 		if cfg.Clients.DB.DSN != "postgres://localhost:5432/foobar" {
 			t.Fatalf("got DSN %q, want %q", cfg.Clients.DB.DSN, "postgres://localhost:5432/foobar")
+		}
+
+		if cfg.Clients.DB.TestDSN != "postgres://localhost:5432/testing" {
+			t.Fatalf(
+				"got test DSN %q, want %q",
+				cfg.Clients.DB.TestDSN, "postgres://localhost:5432/testing",
+			)
 		}
 
 		if cfg.Auth.JWKSURL != "https://example.com/jwks" {

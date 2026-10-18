@@ -8,9 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/internal/utils"
 )
-
-const databaseName = "testing"
 
 type Client struct {
 	db.Client
@@ -21,20 +20,37 @@ type Client struct {
 func New(t testing.TB, dsn string) *Client {
 	t.Helper()
 
-	config, err := pgxpool.ParseConfig(dsn)
+	if dsn == "" {
+		panic("CLIENTS_DB_TEST_DSN is not set")
+	}
+
+	pool, err := pgxpool.New(t.Context(), dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	config.ConnConfig.Database = databaseName
+	t.Cleanup(pool.Close)
 
-	pool, err := pgxpool.NewWithConfig(t.Context(), config)
+	err = pool.Ping(t.Context())
+	if utils.HasCode(err, "3D000") {
+		panic("the testing database does not exist")
+	}
+
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := pool.Ping(t.Context()); err != nil {
+	migrated := false
+
+	err = pool.QueryRow(
+		t.Context(), "SELECT to_regclass('goose_db_version') IS NOT NULL",
+	).Scan(&migrated)
+	if err != nil {
 		t.Fatal(err)
+	}
+
+	if !migrated {
+		panic("the testing database has no migrations applied")
 	}
 
 	client := &Client{
@@ -42,7 +58,6 @@ func New(t testing.TB, dsn string) *Client {
 		pool:   pool,
 	}
 
-	t.Cleanup(pool.Close)
 	client.CleanupAfter(t)
 
 	return client
