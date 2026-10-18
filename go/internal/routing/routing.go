@@ -80,7 +80,7 @@ func register[I, O any](
 			return result, err
 		}
 
-		if cause := errors.Unwrap(err); cause != nil {
+		if cause := errors.Unwrap(statusErr); cause != nil {
 			logger.Error(
 				"handler failed",
 				zap.String("operation", operation.OperationID),

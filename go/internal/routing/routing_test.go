@@ -1,8 +1,10 @@
 package routing
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -11,6 +13,7 @@ import (
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db/dbtest"
+	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
@@ -63,6 +66,41 @@ func TestHandle(t *testing.T) {
 				body.Message,
 				"user-1 (Ada Lovelace, ada-lovelace@example.com) OK",
 			)
+		}
+	})
+
+	t.Run("a wrapped status error logs its cause", func(t *testing.T) {
+		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
+
+		core, logs := observer.New(zapcore.ErrorLevel)
+		logger := zap.New(core)
+
+		api := newTestAPI(t)
+
+		register(logger, api.public, huma.Operation{
+			OperationID: "GetWrappedError",
+			Method:      http.MethodGet,
+			Path:        "/wrapped-error",
+		}, func(context.Context, *struct{}) (*struct{}, error) {
+			return nil, fmt.Errorf("wrapped: %w", httpx.NewStatusError(
+				http.StatusServiceUnavailable, "database unavailable", cause,
+			))
+		})
+
+		response := get(api.router, "/wrapped-error", "")
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
+		}
+
+		entries := logs.FilterMessage("handler failed").All()
+		if len(entries) != 1 {
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
+		}
+
+		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
+			logged, "connection refused",
+		) {
+			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
 
