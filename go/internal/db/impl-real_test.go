@@ -2,22 +2,17 @@ package db_test
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
 func TestExecTx(t *testing.T) {
-	cfg, err := config.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	database := dbtest.New(t, cfg.Clients.DB.TestDSN)
+	database := dbtest.New(t, os.Getenv("CLIENTS_DB_TEST_DSN"))
 
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)
