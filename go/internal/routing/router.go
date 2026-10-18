@@ -9,11 +9,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
-	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
-	"go.uber.org/zap"
 )
 
 const (
@@ -32,13 +29,16 @@ const (
 // count towards the limit. Huma runs anything attached to the API before anything attached to a
 // group, so the rate limiter and the JWT check are both attached to each group, in that order.
 func NewAPI(
-	r chi.Router,
-	humaConfig huma.Config,
-	jwtCache *jwk.Cache,
-	authConfig auth.Config,
-	dbClient db.Client,
-	logger *zap.Logger,
+	r chi.Router, humaConfig huma.Config, authClient *auth.Client,
 ) (public *huma.Group, secured *huma.Group) {
+	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+		auth.JWTSchemeKey: {
+			Type:         "http",
+			Scheme:       "bearer",
+			BearerFormat: "JWT",
+		},
+	}
+
 	api := humachi.New(r, humaConfig)
 
 	public = huma.NewGroup(api)
@@ -49,7 +49,7 @@ func NewAPI(
 	secured.UseSimpleModifier(declareJWT)
 	secured.UseMiddleware(
 		rateLimit(securedRateLimit),
-		auth.NewJWTAuthMiddleware(api, jwtCache, authConfig, dbClient, logger),
+		authClient.Middleware(api),
 	)
 
 	return public, secured

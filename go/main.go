@@ -69,7 +69,16 @@ func run() error {
 		logger.Info("app booting in development mode...")
 	}
 
-	appClients, err := clients.New(appCtx, logger, db.Config{DSN: cfg.Clients.DB.DSN})
+	appClients, err := clients.New(
+		appCtx,
+		logger,
+		db.Config{DSN: cfg.Clients.DB.DSN},
+		auth.Config{
+			JWKSURL:  cfg.Auth.JWKSURL,
+			Issuer:   cfg.Auth.Issuer,
+			Audience: cfg.Auth.Audience,
+		},
+	)
 	if err != nil {
 		return fmt.Errorf("error creating clients: %w", err)
 	}
@@ -92,16 +101,10 @@ func run() error {
 	router := routing.NewRouter(corsHandler)
 
 	if err := routing.Handle(
-		appCtx,
 		logger,
 		router,
 		appClients,
 		huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
-		auth.Config{
-			JWKSURL:  cfg.Auth.JWKSURL,
-			Issuer:   cfg.Auth.Issuer,
-			Audience: cfg.Auth.Audience,
-		},
 	); err != nil {
 		return fmt.Errorf("error setting up routing: %w", err)
 	}

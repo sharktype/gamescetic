@@ -31,26 +31,26 @@ func provisionedUsers() db.Client {
 	return &dbtest.Stub{User: provisionedUser()}
 }
 
-func provisionedClients() *clients.Clients {
-	return &clients.Clients{DB: provisionedUsers()}
+func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
+	t.Helper()
+
+	users := provisionedUsers()
+	authClient := authtest.New(t, users)
+
+	return &clients.Clients{DB: users, Auth: authClient.Client}, authClient
 }
 
-func newTestAPI(
-	t *testing.T, idp *authtest.IDP, dbClient db.Client,
-) (chi.Router, *huma.Group, *huma.Group) {
+func newTestAPI(t *testing.T) (chi.Router, *huma.Group, *huma.Group, *authtest.Client) {
 	t.Helper()
+
+	appClients, authClient := provisionedClients(t)
 
 	router := chi.NewMux()
 	public, secured := NewAPI(
-		router,
-		huma.DefaultConfig("test", "0.0.0"),
-		idp.Cache,
-		idp.Config(),
-		dbClient,
-		zap.NewNop(),
+		router, huma.DefaultConfig("test", "0.0.0"), appClients.Auth,
 	)
 
-	return router, public, secured
+	return router, public, secured, authClient
 }
 
 func testRouter(t *testing.T) *chi.Mux {
@@ -66,23 +66,22 @@ func testRouter(t *testing.T) *chi.Mux {
 	return NewRouter(corsHandler)
 }
 
-func newHandledRouter(t *testing.T, idp *authtest.IDP) http.Handler {
+func newHandledRouter(t *testing.T) (http.Handler, *authtest.Client) {
 	t.Helper()
 
 	router := testRouter(t)
+	appClients, authClient := provisionedClients(t)
 
 	if err := Handle(
-		t.Context(),
 		zap.NewNop(),
 		router,
-		provisionedClients(),
+		appClients,
 		huma.DefaultConfig("test", "1"),
-		idp.Config(),
 	); err != nil {
 		t.Fatal(err)
 	}
 
-	return router
+	return router, authClient
 }
 
 func get(router http.Handler, path, authorization string) *httptest.ResponseRecorder {

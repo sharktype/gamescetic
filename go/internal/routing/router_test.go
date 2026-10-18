@@ -8,14 +8,14 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 )
 
 func TestNewAPI(t *testing.T) {
-	idp := authtest.NewIDP(t)
 
 	t.Run("an unsecured operation answers without providing a token", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, idp, provisionedUsers())
+		router, public, _, _ := newTestAPI(t)
 		handler := authtest.RegisterProbe(public, nil)
 
 		if code := get(router, authtest.ProbePath, "").Code; code != http.StatusOK {
@@ -28,7 +28,7 @@ func TestNewAPI(t *testing.T) {
 	})
 
 	t.Run("the public group refuses an operation declaring a JWT requirement", func(t *testing.T) {
-		_, public, _ := newTestAPI(t, idp, provisionedUsers())
+		_, public, _, _ := newTestAPI(t)
 
 		defer func() {
 			if recover() == nil {
@@ -40,10 +40,10 @@ func TestNewAPI(t *testing.T) {
 	})
 
 	t.Run("the secured group keeps scopes and documents one JWT requirement", func(t *testing.T) {
-		router, _, secured := newTestAPI(t, idp, provisionedUsers())
+		router, _, secured, authClient := newTestAPI(t)
 		handler := authtest.RegisterProbe(secured, authtest.RequireJWT("posts:read"))
 
-		code := get(router, authtest.ProbePath, "Bearer "+idp.Token(t, "sub-1")).Code
+		code := get(router, authtest.ProbePath, "Bearer "+authClient.Token(t, "sub-1")).Code
 		if code != http.StatusForbidden {
 			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
 		}
@@ -55,6 +55,10 @@ func TestNewAPI(t *testing.T) {
 		security := secured.OpenAPI().Paths[authtest.ProbePath].Get.Security
 		if len(security) != 1 {
 			t.Fatalf("got %d documented security requirements, want 1", len(security))
+		}
+
+		if _, ok := secured.OpenAPI().Components.SecuritySchemes[auth.JWTSchemeKey]; !ok {
+			t.Fatal("the API does not document the JWT security scheme")
 		}
 	})
 
@@ -73,7 +77,7 @@ func TestNewAPI(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			router, _, secured := newTestAPI(t, idp, provisionedUsers())
+			router, _, secured, _ := newTestAPI(t)
 			handler := authtest.RegisterProbe(secured, nil)
 
 			if code := get(
@@ -157,7 +161,7 @@ type thingInput struct {
 
 func TestRateLimit(t *testing.T) {
 	t.Run("limits by operation rather than URL path", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, authtest.NewIDP(t), provisionedUsers())
+		router, public, _, _ := newTestAPI(t)
 
 		huma.Register(public, huma.Operation{
 			OperationID: "GetThing",
@@ -180,7 +184,7 @@ func TestRateLimit(t *testing.T) {
 	})
 
 	t.Run("hitting the limit on one operation does not block another", func(t *testing.T) {
-		router, public, _ := newTestAPI(t, authtest.NewIDP(t), provisionedUsers())
+		router, public, _, _ := newTestAPI(t)
 
 		authtest.RegisterProbe(public, nil)
 

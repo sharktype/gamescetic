@@ -32,7 +32,7 @@ func GetHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 }
 
 func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput, error) {
-	user, ok := auth.ViewerFromContext(ctx)
+	user, ok := auth.UserFromContext(ctx)
 	if !ok {
 		// Defensive: this actually isn't expected to be reachable since the middleware should 403
 		// when the user is not authenticated.

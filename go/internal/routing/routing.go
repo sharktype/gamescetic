@@ -13,29 +13,14 @@ import (
 )
 
 func Handle(
-	ctx context.Context,
 	logger *zap.Logger,
-	r *chi.Mux,
-	clients *clients.Clients,
+	mux *chi.Mux,
+	appClients *clients.Clients,
 	humaConfig huma.Config,
-	authConfig auth.Config,
 ) error {
-	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		auth.JWTSchemeKey: {
-			Type:         "http",
-			Scheme:       "bearer",
-			BearerFormat: "JWT",
-		},
-	}
-
 	humaConfig.OnAddOperation = append(humaConfig.OnAddOperation, auth.MustSingleJWTRequirement)
 
-	jwtCache, err := auth.NewJWKSet(ctx, authConfig.JWKSURL)
-	if err != nil {
-		return err
-	}
-
-	public, secured := NewAPI(r, humaConfig, jwtCache, authConfig, clients.DB, logger)
+	public, secured := NewAPI(mux, humaConfig, appClients.Auth)
 
 	register(logger, public, huma.Operation{
 		OperationID: "GetHealth",
@@ -49,7 +34,7 @@ func Handle(
 		Summary:     "Get Database Health",
 		Method:      http.MethodGet,
 		Path:        "/health/db",
-	}, health.GetDatabaseHealth(logger, clients.DB))
+	}, health.GetDatabaseHealth(logger, appClients.DB))
 
 	register(logger, secured, huma.Operation{
 		OperationID: "GetAuthHealth",

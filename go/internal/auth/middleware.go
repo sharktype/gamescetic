@@ -13,26 +13,12 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
-	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
 )
 
 const JWTSchemeKey = "JWT"
 
-type contextKey int
-
-const userKey contextKey = iota
-
-func ViewerFromContext(ctx context.Context) (generated.User, bool) {
-	user, ok := ctx.Value(userKey).(generated.User)
-
-	return user, ok
-}
-
-func NewJWTAuthMiddleware(
-	api huma.API, cache *jwk.Cache, cfg Config, users db.Client, logger *zap.Logger,
-) func(ctx huma.Context, next func(huma.Context)) {
+func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		neededScopes, required := jwtScopes(ctx.Operation())
 		if !required {
@@ -41,7 +27,7 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
-		token, sub, ok := verifiedToken(ctx, cache, cfg)
+		token, sub, ok := verifiedToken(ctx, c.cache, c.cfg)
 		if !ok {
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
@@ -54,16 +40,16 @@ func NewJWTAuthMiddleware(
 			return
 		}
 
-		user, err := users.GetUserBySub(ctx.Context(), sub)
+		user, err := c.db.GetUserBySub(ctx.Context(), sub)
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.Warn("verified subject is not provisioned", zap.String("sub", sub))
+			c.logger.Warn("verified subject is not provisioned", zap.String("sub", sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
 		}
 
 		if err != nil {
-			logger.Error(
+			c.logger.Error(
 				"error resolving user in middleware", zap.String("sub", sub), zap.Error(err),
 			)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")

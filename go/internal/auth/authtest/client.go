@@ -15,18 +15,20 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/sharktype/satchel/internal/auth"
+	"github.com/sharktype/satchel/internal/db"
+	"go.uber.org/zap"
 )
 
-type IDP struct {
-	JWKSURL  string
-	Issuer   string
-	Audience string
-	Cache    *jwk.Cache
+// Client is an auth.Client verifying tokens from a throwaway IDP, which it also signs them with.
+type Client struct {
+	*auth.Client
 
 	signingKey jwk.Key
+	issuer     string
+	audience   string
 }
 
-func NewIDP(t *testing.T) *IDP {
+func New(t *testing.T, db db.Client) *Client {
 	t.Helper()
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -65,35 +67,34 @@ func NewIDP(t *testing.T) *IDP {
 	)
 	t.Cleanup(server.Close)
 
-	cache, err := auth.NewJWKSet(t.Context(), server.URL)
+	issuer := "issuer"
+	audience := "audience"
+
+	authClient, err := auth.New(
+		t.Context(),
+		db,
+		zap.NewNop(),
+		auth.Config{JWKSURL: server.URL, Issuer: issuer, Audience: audience},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return &IDP{
-		JWKSURL:    server.URL,
-		Issuer:     "issuer",
-		Audience:   "audience",
-		Cache:      cache,
+	return &Client{
+		Client:     authClient,
 		signingKey: signingKey,
+		issuer:     issuer,
+		audience:   audience,
 	}
 }
 
-func (i *IDP) Config() auth.Config {
-	return auth.Config{
-		JWKSURL:  i.JWKSURL,
-		Issuer:   i.Issuer,
-		Audience: i.Audience,
-	}
-}
-
-func (i *IDP) Token(t *testing.T, sub string) string {
+func (c *Client) Token(t *testing.T, sub string) string {
 	t.Helper()
 
-	return i.TokenWithScopes(t, sub, nil)
+	return c.TokenWithScopes(t, sub, nil)
 }
 
-func (i *IDP) TokenWithScopes(t *testing.T, sub string, scopes []string) string {
+func (c *Client) TokenWithScopes(t *testing.T, sub string, scopes []string) string {
 	t.Helper()
 
 	token := jwt.New()
@@ -102,11 +103,11 @@ func (i *IDP) TokenWithScopes(t *testing.T, sub string, scopes []string) string 
 		t.Fatal(err)
 	}
 
-	if err := token.Set(jwt.IssuerKey, i.Issuer); err != nil {
+	if err := token.Set(jwt.IssuerKey, c.issuer); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := token.Set(jwt.AudienceKey, []string{i.Audience}); err != nil {
+	if err := token.Set(jwt.AudienceKey, []string{c.audience}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -120,7 +121,7 @@ func (i *IDP) TokenWithScopes(t *testing.T, sub string, scopes []string) string 
 		}
 	}
 
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), i.signingKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), c.signingKey))
 	if err != nil {
 		t.Fatal(err)
 	}

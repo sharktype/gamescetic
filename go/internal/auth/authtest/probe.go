@@ -20,8 +20,8 @@ type probeOutput struct {
 }
 
 type Probe struct {
-	Ran    bool
-	Viewer generated.User
+	Ran  bool
+	User generated.User
 }
 
 func RegisterProbe(api huma.API, security []map[string][]string) *Probe {
@@ -34,10 +34,14 @@ func RegisterProbe(api huma.API, security []map[string][]string) *Probe {
 		Security:    security,
 	}, func(ctx context.Context, _ *probeInput) (*probeOutput, error) {
 		recorded.Ran = true
-		recorded.Viewer, _ = auth.ViewerFromContext(ctx)
+		recorded.User, _ = auth.UserFromContext(ctx)
 
 		return &probeOutput{}, nil
 	})
 
 	return recorded
+}
+
+func RequireJWT(scopes ...string) []map[string][]string {
+	return []map[string][]string{{auth.JWTSchemeKey: scopes}}
 }
