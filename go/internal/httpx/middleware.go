@@ -12,12 +12,13 @@ import (
 type Middleware = func(next nethttp.Handler) nethttp.Handler
 
 func NewCORSHandler(cfg CORSConfig) (Middleware, error) {
-	if err := validate(cfg.AllowedOrigins); err != nil {
+	origins, err := normalize(cfg.AllowedOrigins)
+	if err != nil {
 		return nil, fmt.Errorf("invalid CORS configuration: %w", err)
 	}
 
 	return cors.Handler(cors.Options{
-		AllowedOrigins:   cfg.AllowedOrigins,
+		AllowedOrigins:   origins,
 		AllowedMethods:   cfg.AllowedMethods,
 		AllowedHeaders:   cfg.AllowedHeaders,
 		ExposedHeaders:   cfg.ExposedHeaders,
@@ -42,21 +43,23 @@ func SecurityHeaders() Middleware {
 	}
 }
 
-func validate(origins []string) error {
+func normalize(origins []string) ([]string, error) {
 	if len(origins) == 0 {
-		return errors.New("AllowedOrigins is required; list at least one origin")
+		return nil, errors.New("AllowedOrigins is required; list at least one origin")
 	}
 
-	for _, origin := range origins {
-		trimmed := strings.TrimSpace(origin)
-		if trimmed == "" {
-			return errors.New("AllowedOrigins contains an empty origin")
+	normalized := make([]string, len(origins))
+	for i, origin := range origins {
+		normalized[i] = strings.TrimSpace(origin)
+
+		if normalized[i] == "" {
+			return nil, errors.New("AllowedOrigins contains an empty origin")
 		}
 
-		if trimmed == "*" {
-			return errors.New(`AllowedOrigins must list explicit origins, not "*"`)
+		if normalized[i] == "*" {
+			return nil, errors.New(`AllowedOrigins must list explicit origins, not "*"`)
 		}
 	}
 
-	return nil
+	return normalized, nil
 }
