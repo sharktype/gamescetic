@@ -2,6 +2,7 @@ package routing
 
 import (
 	"fmt"
+	"maps"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -26,13 +27,17 @@ const (
 func newAPI(
 	r chi.Router, humaConfig huma.Config, authClient *auth.Client,
 ) (public *huma.Group, secured *huma.Group) {
-	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
-		auth.JWTSchemeKey: {
-			Type:         "http",
-			Scheme:       "bearer",
-			BearerFormat: "JWT",
-		},
+	schemes := make(
+		map[string]*huma.SecurityScheme, len(humaConfig.Components.SecuritySchemes)+1,
+	)
+
+	maps.Copy(schemes, humaConfig.Components.SecuritySchemes)
+	schemes[auth.JWTSchemeKey] = &huma.SecurityScheme{
+		Type:         "http",
+		Scheme:       "bearer",
+		BearerFormat: "JWT",
 	}
+	humaConfig.Components.SecuritySchemes = schemes
 
 	api := humachi.New(r, humaConfig)
 

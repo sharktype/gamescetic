@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
@@ -45,6 +46,25 @@ func TestNewAPI(t *testing.T) {
 		}()
 
 		authtest.RegisterProbe(api.public, authtest.RequireJWT())
+	})
+
+	t.Run("the JWT scheme is merged into caller-provided schemes", func(t *testing.T) {
+		config := huma.DefaultConfig("test", "0.0.0")
+		config.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
+			"ApiKey": {Type: "apiKey", In: "header", Name: "X-API-Key"},
+		}
+
+		appClients, _ := provisionedClients(t)
+		_, secured := newAPI(chi.NewMux(), config, appClients.Auth)
+
+		schemes := secured.OpenAPI().Components.SecuritySchemes
+		if _, ok := schemes["ApiKey"]; !ok {
+			t.Fatal("newAPI dropped a caller-provided security scheme")
+		}
+
+		if _, ok := schemes[auth.JWTSchemeKey]; !ok {
+			t.Fatal("newAPI did not add the JWT security scheme")
+		}
 	})
 
 	t.Run("the secured group refuses an operation declaring two JWT requirements", func(t *testing.T) {
