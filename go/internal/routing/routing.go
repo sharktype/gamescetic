@@ -17,8 +17,8 @@ func Handle(
 	mux *chi.Mux,
 	appClients *clients.Clients,
 	humaConfig huma.Config,
-) error {
-	public, secured := NewAPI(mux, humaConfig, appClients.Auth)
+) {
+	public, secured := newAPI(mux, humaConfig, appClients.Auth)
 
 	register(logger, public, huma.Operation{
 		OperationID: "GetHealth",
@@ -32,7 +32,7 @@ func Handle(
 		Summary:     "Get Database Health",
 		Method:      http.MethodGet,
 		Path:        "/health/db",
-	}, health.GetDatabaseHealth(logger, appClients.DB))
+	}, health.GetDatabaseHealth(appClients.DB))
 
 	register(logger, secured, huma.Operation{
 		OperationID: "GetAuthHealth",
@@ -47,8 +47,6 @@ func Handle(
 		Method:      http.MethodGet,
 		Path:        "/health/error",
 	}, health.GetErrorHealth)
-
-	return nil
 }
 
 func register[I, O any](
@@ -78,7 +76,18 @@ func register[I, O any](
 			return result, err
 		}
 
-		if statusErr.GetStatus() >= http.StatusInternalServerError {
+		if statusErr.GetStatus() < http.StatusInternalServerError {
+			return result, err
+		}
+
+		if cause := errors.Unwrap(err); cause != nil {
+			logger.Error(
+				"handler failed",
+				zap.String("operation", operation.OperationID),
+				zap.Int("status", statusErr.GetStatus()),
+				zap.Error(cause),
+			)
+		} else {
 			logger.Debug(
 				"handler returned a server error",
 				zap.String("operation", operation.OperationID),

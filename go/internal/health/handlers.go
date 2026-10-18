@@ -3,11 +3,12 @@ package health
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
+	"github.com/sharktype/satchel/internal/httpx"
 )
 
 type GetHealthInput struct{}
@@ -20,7 +21,7 @@ type GetHealthOutput struct {
 
 type GetAuthHealthOutput struct {
 	Body struct {
-		Message string `json:"message" example:"user-1 OK" doc:"health check response message"`
+		Message string `json:"message" example:"user-1 (Ada, ada-lovelace@example.com) OK" doc:"health check response message"`
 	}
 }
 
@@ -41,21 +42,21 @@ func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput
 	}
 
 	resp := &GetAuthHealthOutput{}
-	resp.Body.Message = fmt.Sprintf("%s OK", user.ID)
+	resp.Body.Message = fmt.Sprintf("%s (%s, %s) OK", user.ID, user.Name, user.Email)
 
 	return resp, nil
 }
 
 func GetDatabaseHealth(
-	logger *zap.Logger, database db.Client,
+	database db.Client,
 ) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}
 
 		if err := database.Ping(ctx); err != nil {
-			logger.Error("database health check failed", zap.Error(err))
-
-			return resp, huma.Error503ServiceUnavailable("database unavailable")
+			return resp, httpx.NewStatusError(
+				http.StatusServiceUnavailable, "database unavailable", err,
+			)
 		}
 
 		resp.Body.Message = "database connection OK"

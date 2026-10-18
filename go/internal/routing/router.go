@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
+	"go.uber.org/zap"
 )
 
 const (
@@ -19,8 +20,8 @@ const (
 	compressionLevel = 5
 )
 
-// NewAPI returns the groups on which every operation must be registered.
-func NewAPI(
+// newAPI returns the groups on which every operation must be registered.
+func newAPI(
 	r chi.Router, humaConfig huma.Config, authClient *auth.Client,
 ) (public *huma.Group, secured *huma.Group) {
 	humaConfig.Components.SecuritySchemes = map[string]*huma.SecurityScheme{
@@ -49,7 +50,7 @@ func NewAPI(
 // Every request passes through this router, including ones huma/the API never sees, such as /ping.
 //
 // Middleware here apply to _all_ traffic, and middleware in the API groups are layered on top.
-func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
+func NewRouter(logger *zap.Logger, corsMiddleware httpx.Middleware) *chi.Mux {
 	router := chi.NewMux()
 
 	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
@@ -61,7 +62,10 @@ func NewRouter(corsMiddleware httpx.Middleware) *chi.Mux {
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(middleware.RealIP)
-	router.Use(middleware.Logger)
+	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
+		Logger:  zap.NewStdLog(logger),
+		NoColor: true,
+	}))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)

@@ -98,16 +98,14 @@ func run() error {
 		return err
 	}
 
-	router := routing.NewRouter(corsHandler)
+	router := routing.NewRouter(logger, corsHandler)
 
-	if err := routing.Handle(
+	routing.Handle(
 		logger,
 		router,
 		appClients,
 		huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
-	); err != nil {
-		return fmt.Errorf("error setting up routing: %w", err)
-	}
+	)
 
 	// Initialise server:
 
