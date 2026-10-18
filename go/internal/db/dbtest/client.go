@@ -8,7 +8,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/internal/utils"
 )
 
 type Client struct {
@@ -21,7 +20,7 @@ func New(t testing.TB, dsn string) *Client {
 	t.Helper()
 
 	if dsn == "" {
-		panic("CLIENTS_DB_TEST_DSN is not set")
+		t.Fatal("CLIENTS_DB_TEST_DSN is not set")
 	}
 
 	pool, err := pgxpool.New(t.Context(), dsn)
@@ -32,8 +31,8 @@ func New(t testing.TB, dsn string) *Client {
 	t.Cleanup(pool.Close)
 
 	err = pool.Ping(t.Context())
-	if utils.HasCode(err, "3D000") {
-		panic("the testing database does not exist")
+	if hasCode(err, "3D000") {
+		t.Fatal("the testing database does not exist")
 	}
 
 	if err != nil {
@@ -50,7 +49,7 @@ func New(t testing.TB, dsn string) *Client {
 	}
 
 	if !migrated {
-		panic("the testing database has no migrations applied")
+		t.Fatal("the testing database has no migrations applied")
 	}
 
 	client := &Client{
