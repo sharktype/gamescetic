@@ -22,13 +22,14 @@ import (
 
 const readHeaderTimeout = 5 * time.Second
 const readTimeout = 30 * time.Second
-
-// WriteTimeout has to outlast the router's own middleware.Timeout to ensure the response is fully
-// written before the middleware times out.
-
-const writeTimeout = 70 * time.Second
 const idleTimeout = 120 * time.Second
-const shutdownTimeout = 30 * time.Second
+
+// These have to outlast the router's middleware.Timeout so responses are fully written and
+// in-flight requests are drained before the server gives up.
+
+const graceMargin = 10 * time.Second
+const writeTimeout = routing.RequestTimeout + graceMargin
+const shutdownTimeout = routing.RequestTimeout + graceMargin
 
 func main() {
 	if err := run(); err != nil {

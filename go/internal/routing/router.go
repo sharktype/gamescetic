@@ -14,7 +14,9 @@ import (
 )
 
 const (
-	requestTimeout   = 60 * time.Second
+	// RequestTimeout bounds handler execution; some server timeouts derive from it.
+	RequestTimeout = 60 * time.Second
+
 	publicRateLimit  = 30
 	securedRateLimit = 60
 	compressionLevel = 5
@@ -70,7 +72,7 @@ func NewRouter(logger *zap.Logger, corsMiddleware httpx.Middleware) *chi.Mux {
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)
 	router.Use(middleware.GetHead)
-	router.Use(middleware.Timeout(requestTimeout))
+	router.Use(middleware.Timeout(RequestTimeout))
 	router.Use(middleware.Compress(compressionLevel))
 	router.Use(corsMiddleware)
 
