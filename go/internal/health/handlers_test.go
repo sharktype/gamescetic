@@ -1,7 +1,6 @@
 package health
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net/http"
@@ -9,10 +8,10 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-
-	"github.com/sharktype/satchel/internal/db/dbtest"
+	dbtest "github.com/sharktype/satchel/internal/db/dbtest"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestGetDatabaseHealth(t *testing.T) {
@@ -32,13 +31,9 @@ func TestGetDatabaseHealth(t *testing.T) {
 	t.Run("a failing check logs the cause and returns a fixed 503", func(t *testing.T) {
 		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
 
-		var logged bytes.Buffer
+		core, logs := observer.New(zapcore.DebugLevel)
 
-		logger := zap.New(zapcore.NewCore(
-			zapcore.NewConsoleEncoder(zap.NewDevelopmentEncoderConfig()),
-			zapcore.AddSync(&logged),
-			zapcore.DebugLevel,
-		))
+		logger := zap.New(core)
 
 		_, err := GetDatabaseHealth(
 			logger, &dbtest.Stub{PingErr: cause},
@@ -60,12 +55,15 @@ func TestGetDatabaseHealth(t *testing.T) {
 			t.Fatalf("the response error leaks the cause: %q", statusErr.Error())
 		}
 
-		if !strings.Contains(logged.String(), "database health check failed") {
-			t.Fatalf("the failure was not logged: %q", logged.String())
+		entries := logs.FilterMessage("database health check failed").All()
+		if len(entries) != 1 {
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if !strings.Contains(logged.String(), "connection refused") {
-			t.Fatalf("the log entry lost the cause: %q", logged.String())
+		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
+			logged, "connection refused",
+		) {
+			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
 }

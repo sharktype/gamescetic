@@ -7,7 +7,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db"
@@ -18,17 +17,8 @@ import (
 
 // "provisioned" means stubbed rather than using the real test database.
 
-func provisionedUser() generated.User {
-	return generated.User{
-		ID:    "user-1",
-		Sub:   "sub-1",
-		Name:  "Ada Lovelace",
-		Email: "ada-lovelace@example.com",
-	}
-}
-
 func provisionedUsers() db.Client {
-	return &dbtest.Stub{User: provisionedUser()}
+	return &dbtest.Stub{User: dbtest.ProvisionedUser}
 }
 
 func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {

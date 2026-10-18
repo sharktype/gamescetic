@@ -19,6 +19,13 @@ type Stub struct {
 
 var _ db.Client = (*Stub)(nil)
 
+var ProvisionedUser = generated.User{
+	ID:    "user-1",
+	Sub:   "sub-1",
+	Name:  "Ada Lovelace",
+	Email: "ada-lovelace@example.com",
+}
+
 func (s *Stub) GetUserBySub(_ context.Context, sub string) (generated.User, error) {
 	if s.UserErr != nil {
 		return generated.User{}, s.UserErr

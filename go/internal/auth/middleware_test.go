@@ -6,18 +6,10 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
-	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 )
-
-var provisioned = generated.User{
-	ID:    "user-1",
-	Sub:   "sub-1",
-	Name:  "Ada Lovelace",
-	Email: "ada-lovelace@example.com",
-}
 
 func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Client) {
 	t.Helper()
@@ -32,7 +24,7 @@ func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Clie
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a verified token resolves the user by its subject", func(t *testing.T) {
-		api, authClient := newTestAPI(t, &dbtest.Stub{User: provisioned})
+		api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser})
 		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 		token := authClient.Token(t, "sub-1")
@@ -42,8 +34,8 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if probe.User != provisioned {
-			t.Fatalf("got user %+v, want %+v", probe.User, provisioned)
+		if probe.User != dbtest.ProvisionedUser {
+			t.Fatalf("got user %+v, want %+v", probe.User, dbtest.ProvisionedUser)
 		}
 	})
 
@@ -55,23 +47,23 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 	}{
 		{
 			name:  "a token signed by another key is rejected",
-			users: &dbtest.Stub{User: provisioned},
+			users: &dbtest.Stub{User: dbtest.ProvisionedUser},
 			token: func(t *testing.T, _ *authtest.Client) string {
-				return authtest.New(t, &dbtest.Stub{User: provisioned}).Token(t, "sub-1")
+				return authtest.New(t, &dbtest.Stub{User: dbtest.ProvisionedUser}).Token(t, "sub-1")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:  "a token without a subject is rejected",
-			users: &dbtest.Stub{User: provisioned},
+			users: &dbtest.Stub{User: dbtest.ProvisionedUser},
 			token: func(t *testing.T, client *authtest.Client) string {
 				return client.Token(t, "")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
-			name:  "a subject that is not provisioned is forbidden",
-			users: &dbtest.Stub{User: provisioned},
+			name:  "a subject that is not dbtest.ProvisionedUser is forbidden",
+			users: &dbtest.Stub{User: dbtest.ProvisionedUser},
 			token: func(t *testing.T, client *authtest.Client) string {
 				return client.Token(t, "sub-2")
 			},
@@ -149,7 +141,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				api, authClient := newTestAPI(t, &dbtest.Stub{User: provisioned})
+				api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser})
 				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
 				token := authClient.TokenWithScopes(t, "sub-1", test.granted)
@@ -216,7 +208,7 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api, authClient := newTestAPI(t, &dbtest.Stub{User: provisioned})
+			api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser})
 			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			if test.authorization == nil {
