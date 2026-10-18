@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -60,11 +61,28 @@ func register[I, O any](
 
 	huma.Register(api, operation, func(ctx context.Context, input *I) (*O, error) {
 		result, err := callback(ctx, input)
-		if err != nil {
+		if err == nil {
+			return result, nil
+		}
+
+		var statusErr huma.StatusError
+		if !errors.As(err, &statusErr) {
+			// Huma turns this into a 500.
+
 			logger.Error(
-				"router returned error",
+				"handler failed",
 				zap.String("operation", operation.OperationID),
 				zap.Error(err),
+			)
+
+			return result, err
+		}
+
+		if statusErr.GetStatus() >= http.StatusInternalServerError {
+			logger.Debug(
+				"handler returned a server error",
+				zap.String("operation", operation.OperationID),
+				zap.Int("status", statusErr.GetStatus()),
 			)
 		}
 
