@@ -19,10 +19,12 @@ const JWTSchemeKey = "JWT"
 
 func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
-		var neededScopes []string
+		neededScopes, _, err := JWTRequirement(ctx.Operation())
+		if err != nil {
+			c.logger.Error("invalid JWT security requirement", zap.Error(err))
+			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
-		if requirements := JWTRequirements(ctx.Operation()); len(requirements) > 0 {
-			neededScopes = requirements[0]
+			return
 		}
 
 		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
@@ -33,7 +35,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			return
 		}
 
-		token, sub, err := verifiedToken(ctx.Header("Authorization"), keySet, c.cfg)
+		identity, err := verifiedToken(ctx.Header("Authorization"), keySet, c.cfg)
 		if err != nil {
 			c.logger.Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
@@ -41,16 +43,16 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			return
 		}
 
-		if !hasAllScopes(token, neededScopes) {
-			c.logger.Debug("token lacks required scopes", zap.String("sub", sub))
+		if !hasAllScopes(identity.token, neededScopes) {
+			c.logger.Debug("token lacks required scopes", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
 		}
 
-		user, err := c.db.GetUserBySub(ctx.Context(), sub)
+		user, err := c.db.GetUserBySub(ctx.Context(), identity.sub)
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.logger.Warn("verified subject is not provisioned", zap.String("sub", sub))
+			c.logger.Warn("verified subject is not provisioned", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
@@ -58,7 +60,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		if err != nil {
 			c.logger.Error(
-				"error resolving user in middleware", zap.String("sub", sub), zap.Error(err),
+				"error resolving user in middleware", zap.String("sub", identity.sub), zap.Error(err),
 			)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
@@ -69,23 +71,38 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 	}
 }
 
-// JWTRequirements returns the scope lists of every security requirement naming the JWT scheme.
-func JWTRequirements(operation *huma.Operation) [][]string {
-	var requirements [][]string
-
+// JWTRequirement returns the scopes of the operation's JWT security requirement.
+//
+// More than one JWT requirement is not supported.
+func JWTRequirement(operation *huma.Operation) (scopes []string, declared bool, err error) {
 	for _, requirement := range operation.Security {
-		if scopes, ok := requirement[JWTSchemeKey]; ok {
-			requirements = append(requirements, scopes)
+		requirementScopes, ok := requirement[JWTSchemeKey]
+		if !ok {
+			continue
 		}
+
+		if declared {
+			return nil, true, fmt.Errorf(
+				"operation %q declares more than one JWT security requirement",
+				operation.OperationID,
+			)
+		}
+
+		scopes, declared = requirementScopes, true
 	}
 
-	return requirements
+	return scopes, declared, nil
 }
 
-func verifiedToken(authorization string, keySet jwk.Set, cfg Config) (jwt.Token, string, error) {
+type principal struct {
+	token jwt.Token
+	sub   string
+}
+
+func verifiedToken(authorization string, keySet jwk.Set, cfg Config) (principal, error) {
 	raw, err := bearerToken(authorization)
 	if err != nil {
-		return nil, "", err
+		return principal{}, err
 	}
 
 	token, err := jwt.ParseString(raw,
@@ -95,15 +112,15 @@ func verifiedToken(authorization string, keySet jwk.Set, cfg Config) (jwt.Token,
 		jwt.WithAudience(cfg.Audience),
 	)
 	if err != nil {
-		return nil, "", fmt.Errorf("invalid token: %w", err)
+		return principal{}, fmt.Errorf("invalid token: %w", err)
 	}
 
 	sub, ok := token.Subject()
 	if !ok || sub == "" {
-		return nil, "", errors.New("token has no subject")
+		return principal{}, errors.New("token has no subject")
 	}
 
-	return token, sub, nil
+	return principal{token: token, sub: sub}, nil
 }
 
 func hasAllScopes(token jwt.Token, wanted []string) bool {

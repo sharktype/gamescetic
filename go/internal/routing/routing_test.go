@@ -2,8 +2,18 @@ package routing
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 	"testing"
+
+	"github.com/danielgtaylor/huma/v2"
+	"github.com/sharktype/satchel/internal/auth/authtest"
+	"github.com/sharktype/satchel/internal/clients"
+	"github.com/sharktype/satchel/internal/db/dbtest"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+	"go.uber.org/zap/zaptest/observer"
 )
 
 func TestHandle(t *testing.T) {
@@ -47,8 +57,12 @@ func TestHandle(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if body.Message != "user-1 OK" {
-			t.Fatalf("got %q, want %q", body.Message, "user-1 OK")
+		if body.Message != "user-1 (Ada Lovelace, ada-lovelace@example.com) OK" {
+			t.Fatalf(
+				"got %q, want %q",
+				body.Message,
+				"user-1 (Ada Lovelace, ada-lovelace@example.com) OK",
+			)
 		}
 	})
 
@@ -109,6 +123,44 @@ func TestHandle(t *testing.T) {
 			router, "/health/auth", "Bearer not-a-token",
 		).Code; code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
+		}
+	})
+
+	t.Run("a failing dependency logs its cause", func(t *testing.T) {
+		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
+
+		core, logs := observer.New(zapcore.ErrorLevel)
+		logger := zap.New(core)
+
+		users := &dbtest.Stub{User: dbtest.ProvisionedUser(), PingErr: cause}
+		authClient := authtest.New(t, users)
+
+		router := testRouterWithLogger(t, logger)
+		Handle(
+			logger,
+			router,
+			&clients.Clients{DB: users, Auth: authClient.Client},
+			huma.DefaultConfig("test", "1"),
+		)
+
+		response := get(router, "/health/db", "Bearer "+authClient.Token(t, "sub-1"))
+		if response.Code != http.StatusServiceUnavailable {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
+		}
+
+		if strings.Contains(response.Body.String(), "connection refused") {
+			t.Fatalf("the response leaks the cause: %q", response.Body.String())
+		}
+
+		entries := logs.FilterMessage("handler failed").All()
+		if len(entries) != 1 {
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
+		}
+
+		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
+			logged, "connection refused",
+		) {
+			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
 }

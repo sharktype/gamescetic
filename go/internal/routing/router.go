@@ -94,17 +94,12 @@ func NewRouter(logger *zap.Logger, corsMiddleware httpx.Middleware) *chi.Mux {
 // prefix or this JWT requirement, must apply to both, or the spec would not match how the server
 // behaves. Huma cannot tell which changes matter to which, so it runs declareJWT for both.
 func declareJWT(operation *huma.Operation) {
-	requirements := auth.JWTRequirements(operation)
-
-	if len(requirements) > 1 {
-		panic(fmt.Sprintf(
-			"operation %q declares %d JWT security requirements; at most one is supported",
-			operation.OperationID,
-			len(requirements),
-		))
+	_, declared, err := auth.JWTRequirement(operation)
+	if err != nil {
+		panic(err)
 	}
 
-	if len(requirements) == 0 {
+	if !declared {
 		operation.Security = append(
 			operation.Security, map[string][]string{auth.JWTSchemeKey: {}},
 		)
@@ -112,7 +107,12 @@ func declareJWT(operation *huma.Operation) {
 }
 
 func mustNotDeclareJWT(operation *huma.Operation) {
-	if len(auth.JWTRequirements(operation)) > 0 {
+	_, declared, err := auth.JWTRequirement(operation)
+	if err != nil {
+		panic(err)
+	}
+
+	if declared {
 		panic(fmt.Sprintf(
 			"operation %q declares a JWT requirement but is registered on the public group",
 			operation.OperationID,

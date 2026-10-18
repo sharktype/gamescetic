@@ -18,7 +18,7 @@ import (
 // "provisioned" means stubbed rather than using the real test database.
 
 func provisionedUsers() db.Client {
-	return &dbtest.Stub{User: dbtest.ProvisionedUser}
+	return &dbtest.Stub{User: dbtest.ProvisionedUser()}
 }
 
 func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
@@ -43,7 +43,7 @@ func newTestAPI(t *testing.T) testAPI {
 	appClients, authClient := provisionedClients(t)
 
 	router := chi.NewMux()
-	public, secured := NewAPI(
+	public, secured := newAPI(
 		router, huma.DefaultConfig("test", "0.0.0"), appClients.Auth,
 	)
 
@@ -53,6 +53,12 @@ func newTestAPI(t *testing.T) testAPI {
 func testRouter(t *testing.T) *chi.Mux {
 	t.Helper()
 
+	return testRouterWithLogger(t, zap.NewNop())
+}
+
+func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
+	t.Helper()
+
 	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins: []string{"http://example.com"},
 	})
@@ -60,7 +66,7 @@ func testRouter(t *testing.T) *chi.Mux {
 		t.Fatal(err)
 	}
 
-	return NewRouter(corsHandler)
+	return NewRouter(logger, corsHandler)
 }
 
 func newHandledRouter(t *testing.T) (http.Handler, *authtest.Client) {
@@ -69,14 +75,12 @@ func newHandledRouter(t *testing.T) (http.Handler, *authtest.Client) {
 	router := testRouter(t)
 	appClients, authClient := provisionedClients(t)
 
-	if err := Handle(
+	Handle(
 		zap.NewNop(),
 		router,
 		appClients,
 		huma.DefaultConfig("test", "1"),
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
 
 	return router, authClient
 }

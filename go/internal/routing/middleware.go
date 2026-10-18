@@ -27,8 +27,13 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		request, writer := humachi.Unwrap(ctx)
 
-		ip, _ := httprate.KeyByIP(request)
-		if limiter.RespondOnLimit(writer, request, ip+" "+ctx.Operation().OperationID) {
+		ip, err := httprate.KeyByIP(request)
+		if err != nil {
+			ip = request.RemoteAddr
+		}
+
+		key := ip + " " + ctx.Operation().OperationID
+		if limiter.RespondOnLimit(writer, request, key) {
 			return
 		}
 

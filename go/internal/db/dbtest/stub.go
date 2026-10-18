@@ -2,6 +2,7 @@ package dbtest
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/generated"
@@ -9,8 +10,6 @@ import (
 )
 
 type Stub struct {
-	db.Client
-
 	User    generated.User
 	UserErr error
 
@@ -19,11 +18,15 @@ type Stub struct {
 
 var _ db.Client = (*Stub)(nil)
 
-var ProvisionedUser = generated.User{
-	ID:    "user-1",
-	Sub:   "sub-1",
-	Name:  "Ada Lovelace",
-	Email: "ada-lovelace@example.com",
+var errUnsupported = errors.New("dbtest: method not supported by Stub")
+
+func ProvisionedUser() generated.User {
+	return generated.User{
+		ID:    "user-1",
+		Sub:   "sub-1",
+		Name:  "Ada Lovelace",
+		Email: "ada-lovelace@example.com",
+	}
 }
 
 func (s *Stub) GetUserBySub(_ context.Context, sub string) (generated.User, error) {
@@ -38,6 +41,24 @@ func (s *Stub) GetUserBySub(_ context.Context, sub string) (generated.User, erro
 	return s.User, nil
 }
 
+func (s *Stub) GetMeta(context.Context, string) (string, error) {
+	return "", errUnsupported
+}
+
+func (s *Stub) SetMeta(context.Context, generated.SetMetaParams) error {
+	return errUnsupported
+}
+
+func (s *Stub) IsTx() bool {
+	return false
+}
+
+func (s *Stub) ExecTx(context.Context, func(db.Client) error) error {
+	return errUnsupported
+}
+
 func (s *Stub) Ping(context.Context) error {
 	return s.PingErr
 }
+
+func (s *Stub) Close() {}
