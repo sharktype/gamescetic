@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 )
@@ -31,7 +30,7 @@ func TestNewAPI(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if handler.User != (generated.User{}) {
+		if handler.User != (auth.User{}) {
 			t.Fatalf("got user %+v, want none", handler.User)
 		}
 	})
@@ -293,6 +292,32 @@ func TestRateLimit(t *testing.T) {
 
 		if code := get(api.router, "/things/a", "").Code; code == http.StatusTooManyRequests {
 			t.Fatal("exhausting one operation also exhausted another in the same group")
+		}
+	})
+
+	t.Run("an unparseable client address still shares a bucket", func(t *testing.T) {
+		api := newTestAPI(t)
+
+		authtest.RegisterProbe(api.public, nil)
+
+		request := func(i int) int {
+			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
+			request.RemoteAddr = "not-an-address-" + strconv.Itoa(i)
+
+			response := httptest.NewRecorder()
+			api.router.ServeHTTP(response, request)
+
+			return response.Code
+		}
+
+		for i := range publicRateLimit {
+			if code := request(i); code != http.StatusOK {
+				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
+			}
+		}
+
+		if code := request(publicRateLimit); code != http.StatusTooManyRequests {
+			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 	})
 }

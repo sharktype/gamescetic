@@ -80,20 +80,17 @@ func register[I, O any](
 			return result, err
 		}
 
+		logErr := err
 		if cause := errors.Unwrap(statusErr); cause != nil {
-			logger.Error(
-				"handler failed",
-				zap.String("operation", operation.OperationID),
-				zap.Int("status", statusErr.GetStatus()),
-				zap.Error(cause),
-			)
-		} else {
-			logger.Debug(
-				"handler returned a server error",
-				zap.String("operation", operation.OperationID),
-				zap.Int("status", statusErr.GetStatus()),
-			)
+			logErr = cause
 		}
+
+		logger.Error(
+			"handler failed",
+			zap.String("operation", operation.OperationID),
+			zap.Int("status", statusErr.GetStatus()),
+			zap.Error(logErr),
+		)
 
 		return result, err
 	})

@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"net"
 	"net/http"
 	"time"
 
@@ -21,15 +22,19 @@ func rateLimitGlobally(next http.Handler) http.Handler {
 	return httprate.LimitByIP(globalRateLimit, rateLimitWindow)(next)
 }
 
-// rateLimit throttles a single operation per client IP. It should be placed on an API group.
+// rateLimit throttles each operation independently per client IP.
 func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 	limiter := httprate.NewRateLimiter(limit, rateLimitWindow)
 	return func(ctx huma.Context, next func(huma.Context)) {
 		request, writer := humachi.Unwrap(ctx)
 
+		// KeyByIP falls back to the raw RemoteAddr when it cannot split a host and port. If that
+		// value is not an IP, using it as a key would give every connection its own bucket;
+		// share one bucket instead of silently disabling the limit.
+
 		ip, err := httprate.KeyByIP(request)
-		if err != nil {
-			ip = request.RemoteAddr
+		if err != nil || net.ParseIP(ip) == nil {
+			ip = "unknown"
 		}
 
 		key := ip + " " + ctx.Operation().OperationID

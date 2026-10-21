@@ -104,6 +104,37 @@ func TestHandle(t *testing.T) {
 		}
 	})
 
+	t.Run("a status error without a cause is logged", func(t *testing.T) {
+		core, logs := observer.New(zapcore.ErrorLevel)
+		logger := zap.New(core)
+
+		api := newTestAPI(t)
+
+		register(logger, api.public, huma.Operation{
+			OperationID: "GetPlainError",
+			Method:      http.MethodGet,
+			Path:        "/plain-error",
+		}, func(context.Context, *struct{}) (*struct{}, error) {
+			return nil, huma.Error500InternalServerError("intentional failure")
+		})
+
+		response := get(api.router, "/plain-error", "")
+		if response.Code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
+		}
+
+		entries := logs.FilterMessage("handler failed").All()
+		if len(entries) != 1 {
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
+		}
+
+		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
+			logged, "intentional failure",
+		) {
+			t.Fatalf("the log entry lost the error: %q", logged)
+		}
+	})
+
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
 		router, authClient := newHandledRouter(t)
 
