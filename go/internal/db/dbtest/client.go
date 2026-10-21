@@ -60,14 +60,10 @@ func New(t testing.TB) *Client {
 		t.Fatal("the testing database has no migrations applied")
 	}
 
-	client := &Client{
+	return &Client{
 		Store: db.New(pool),
 		pool:  pool,
 	}
-
-	client.CleanupAfter(t)
-
-	return client
 }
 
 func loadDotEnv(t testing.TB) {
