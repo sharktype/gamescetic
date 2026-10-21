@@ -27,6 +27,14 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			return
 		}
 
+		raw, err := bearerToken(ctx.Header("Authorization"))
+		if err != nil {
+			c.logger.Debug("rejected token", zap.Error(err))
+			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
+
+			return
+		}
+
 		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
 		if err != nil {
 			c.logger.Error("could not load JWT signing keys", zap.Error(err))
@@ -35,7 +43,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			return
 		}
 
-		identity, err := verifiedToken(ctx.Header("Authorization"), keySet, c.cfg)
+		identity, err := verifiedToken(raw, keySet, c.cfg)
 		if err != nil {
 			c.logger.Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
@@ -99,12 +107,7 @@ type principal struct {
 	sub   string
 }
 
-func verifiedToken(authorization string, keySet jwk.Set, cfg Config) (principal, error) {
-	raw, err := bearerToken(authorization)
-	if err != nil {
-		return principal{}, err
-	}
-
+func verifiedToken(raw string, keySet jwk.Set, cfg Config) (principal, error) {
 	token, err := jwt.ParseString(raw,
 		jwt.WithKeySet(keySet, jws.WithInferAlgorithmFromKey(true)),
 		jwt.WithValidate(true),
