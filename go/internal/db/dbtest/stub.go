@@ -49,6 +49,10 @@ func (s *Stub) SetMeta(context.Context, generated.SetMetaParams) error {
 	return errUnsupported
 }
 
+func (s *Stub) ExecTx(context.Context, func(generated.Querier) error) error {
+	return errUnsupported
+}
+
 func (s *Stub) Ping(context.Context) error {
 	return s.PingErr
 }
