@@ -54,7 +54,7 @@ func GetDatabaseHealth(
 		resp := &GetHealthOutput{}
 
 		if err := database.Ping(ctx); err != nil {
-			return resp, httpx.NewStatusError(
+			return nil, httpx.NewStatusError(
 				http.StatusServiceUnavailable, "database unavailable", err,
 			)
 		}
