@@ -2,7 +2,6 @@ package db_test
 
 import (
 	"errors"
-	"os"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -11,7 +10,7 @@ import (
 )
 
 func TestExecTx(t *testing.T) {
-	database := dbtest.New(t, os.Getenv("CLIENTS_DB_TEST_DSN"))
+	database := dbtest.New(t)
 
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)

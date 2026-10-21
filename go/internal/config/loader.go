@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/caarlos0/env/v11"
 	"github.com/joho/godotenv"
@@ -45,31 +46,16 @@ func isProduction() (bool, error) {
 	return true, nil
 }
 
-// loadDotEnv loads envars anchored on go.mod's location.
-//
-// Remember that dotenv loading is only done in development; prod must specify envars more
-// explicitly on the environment and don't run into this problem.
 func loadDotEnv() error {
-	dir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get working directory: %w", err)
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		return errors.New("failed to locate .env")
 	}
 
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			err := godotenv.Load(filepath.Join(dir, ".env"))
-			if errors.Is(err, os.ErrNotExist) {
-				return nil
-			}
-
-			return err
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return nil
-		}
-
-		dir = parent
+	err := godotenv.Load(filepath.Join(filepath.Dir(file), "..", "..", ".env"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
 	}
+
+	return err
 }

@@ -2,11 +2,16 @@ package dbtest
 
 import (
 	"context"
+	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
 	"github.com/sharktype/satchel/internal/db"
 )
 
@@ -16,9 +21,12 @@ type Client struct {
 	pool *pgxpool.Pool
 }
 
-func New(t testing.TB, dsn string) *Client {
+func New(t testing.TB) *Client {
 	t.Helper()
 
+	loadDotEnv(t)
+
+	dsn := os.Getenv("CLIENTS_DB_TEST_DSN")
 	if dsn == "" {
 		t.Fatal("CLIENTS_DB_TEST_DSN is not set")
 	}
@@ -60,6 +68,20 @@ func New(t testing.TB, dsn string) *Client {
 	client.CleanupAfter(t)
 
 	return client
+}
+
+func loadDotEnv(t testing.TB) {
+	t.Helper()
+
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("failed to locate .env")
+	}
+
+	err := godotenv.Load(filepath.Join(filepath.Dir(file), "..", "..", "..", ".env"))
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("load .env: %v", err)
+	}
 }
 
 func (c *Client) CleanupAfter(tb testing.TB) {
