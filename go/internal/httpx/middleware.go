@@ -9,9 +9,7 @@ import (
 	"github.com/go-chi/cors"
 )
 
-type Middleware = func(next nethttp.Handler) nethttp.Handler
-
-func NewCORSHandler(cfg CORSConfig) (Middleware, error) {
+func NewCORSHandler(cfg CORSConfig) (func(nethttp.Handler) nethttp.Handler, error) {
 	origins, err := normalize(cfg.AllowedOrigins)
 	if err != nil {
 		return nil, fmt.Errorf("invalid CORS configuration: %w", err)
@@ -27,7 +25,7 @@ func NewCORSHandler(cfg CORSConfig) (Middleware, error) {
 	}), nil
 }
 
-func SecurityHeaders() Middleware {
+func SecurityHeaders() func(nethttp.Handler) nethttp.Handler {
 	// Note this API will only ever serve plain HTTP behind a proxy or CDN, so HSTS belongs at that
 	// hop, not here (e.g., Cloudflare's security settings).
 

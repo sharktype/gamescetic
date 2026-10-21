@@ -3,6 +3,7 @@ package routing
 import (
 	"fmt"
 	"maps"
+	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -57,7 +58,7 @@ func newAPI(
 // Every request passes through this router, including ones huma/the API never sees, such as /ping.
 //
 // Middleware here apply to _all_ traffic, and middleware in the API groups are layered on top.
-func NewRouter(logger *zap.Logger, corsMiddleware httpx.Middleware) *chi.Mux {
+func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
 	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
