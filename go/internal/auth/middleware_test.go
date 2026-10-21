@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
+	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
@@ -34,8 +35,16 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		if probe.User != dbtest.ProvisionedUser() {
-			t.Fatalf("got user %+v, want %+v", probe.User, dbtest.ProvisionedUser())
+		row := dbtest.ProvisionedUser()
+		expected := auth.User{
+			ID:    row.ID,
+			Sub:   row.Sub,
+			Name:  row.Name,
+			Email: row.Email,
+		}
+
+		if probe.User != expected {
+			t.Fatalf("got user %+v, want %+v", probe.User, expected)
 		}
 	})
 

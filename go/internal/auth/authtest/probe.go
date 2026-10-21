@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/generated"
 	"github.com/sharktype/satchel/internal/auth"
 )
 
@@ -21,7 +20,7 @@ type probeOutput struct {
 
 type Probe struct {
 	Ran  bool
-	User generated.User
+	User auth.User
 }
 
 func RegisterProbe(api huma.API, security []map[string][]string) *Probe {

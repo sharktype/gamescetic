@@ -1,18 +1,14 @@
 package auth
 
-import (
-	"context"
-
-	"github.com/sharktype/satchel/generated"
-)
+import "context"
 
 type contextKey int
 
 const userKey contextKey = iota
 
 // UserFromContext returns the user the middleware resolved for the request, if any.
-func UserFromContext(ctx context.Context) (generated.User, bool) {
-	user, ok := ctx.Value(userKey).(generated.User)
+func UserFromContext(ctx context.Context) (User, bool) {
+	user, ok := ctx.Value(userKey).(User)
 
 	return user, ok
 }

@@ -67,7 +67,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 			return
 		}
 
-		next(huma.WithValue(ctx, userKey, user))
+		next(huma.WithValue(ctx, userKey, rowToUser(user)))
 	}
 }
 
