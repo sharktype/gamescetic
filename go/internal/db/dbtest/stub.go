@@ -49,14 +49,6 @@ func (s *Stub) SetMeta(context.Context, generated.SetMetaParams) error {
 	return errUnsupported
 }
 
-func (s *Stub) IsTx() bool {
-	return false
-}
-
-func (s *Stub) ExecTx(context.Context, func(db.Client) error) error {
-	return errUnsupported
-}
-
 func (s *Stub) Ping(context.Context) error {
 	return s.PingErr
 }

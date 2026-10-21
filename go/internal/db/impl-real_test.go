@@ -7,7 +7,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
@@ -17,7 +16,7 @@ func TestExecTx(t *testing.T) {
 	t.Run("commits on success", func(t *testing.T) {
 		database.CleanupAfter(t)
 
-		err := database.ExecTx(t.Context(), func(tx db.Client) error {
+		err := database.ExecTx(t.Context(), func(tx generated.Querier) error {
 			return tx.SetMeta(t.Context(), generated.SetMetaParams{
 				Key:   "key-1",
 				Value: "value-1",
@@ -42,7 +41,7 @@ func TestExecTx(t *testing.T) {
 
 		expectedErr := errors.New("arbitrary error")
 
-		err := database.ExecTx(t.Context(), func(tx db.Client) error {
+		err := database.ExecTx(t.Context(), func(tx generated.Querier) error {
 			if err := tx.SetMeta(t.Context(), generated.SetMetaParams{
 				Key:   "key-1",
 				Value: "value-1",
@@ -58,34 +57,6 @@ func TestExecTx(t *testing.T) {
 
 		if _, err := database.GetMeta(t.Context(), "key-1"); !errors.Is(err, pgx.ErrNoRows) {
 			t.Fatalf("got error %v, want %v", err, pgx.ErrNoRows)
-		}
-	})
-
-	t.Run("does not nest", func(t *testing.T) {
-		database.CleanupAfter(t)
-
-		err := database.ExecTx(t.Context(), func(outer db.Client) error {
-			if !outer.IsTx() {
-				t.Error("expected the outer callback to be transactional")
-			}
-
-			return outer.ExecTx(t.Context(), func(inner db.Client) error {
-				if !inner.IsTx() {
-					t.Error("expected the inner callback to be transactional")
-				}
-
-				return inner.SetMeta(t.Context(), generated.SetMetaParams{
-					Key:   "key-1",
-					Value: "value-1",
-				})
-			})
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if _, err := database.GetMeta(t.Context(), "key-1"); err != nil {
-			t.Fatalf("expected the nested write to be committed: %v", err)
 		}
 	})
 }

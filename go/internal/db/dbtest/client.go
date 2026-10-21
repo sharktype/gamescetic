@@ -11,7 +11,7 @@ import (
 )
 
 type Client struct {
-	db.Client
+	*db.Store
 
 	pool *pgxpool.Pool
 }
@@ -53,8 +53,8 @@ func New(t testing.TB, dsn string) *Client {
 	}
 
 	client := &Client{
-		Client: db.New(pool),
-		pool:   pool,
+		Store: db.New(pool),
+		pool:  pool,
 	}
 
 	client.CleanupAfter(t)

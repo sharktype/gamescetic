@@ -9,39 +9,31 @@ import (
 	"github.com/sharktype/satchel/generated"
 )
 
-// store implements the Client interface.
-type store struct {
+type Store struct {
 	*generated.Queries
 	pool *pgxpool.Pool
-	inTx bool
 }
 
-func New(pool *pgxpool.Pool) Client {
-	return &store{
+var _ Client = (*Store)(nil)
+
+func New(pool *pgxpool.Pool) *Store {
+	return &Store{
 		Queries: generated.New(pool),
 		pool:    pool,
 	}
 }
 
-func (s *store) IsTx() bool {
-	return s.inTx
-}
-
-func (s *store) Close() {
+func (s *Store) Close() {
 	s.pool.Close()
 }
 
-func (s *store) Ping(ctx context.Context) error {
+func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
-func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {
-	if s.inTx {
-		return fn(s)
-	}
-
+// ExecTx runs fn in a transaction, committing only if fn returns nil.
+func (s *Store) ExecTx(ctx context.Context, fn func(generated.Querier) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-
 	if err != nil {
 		return fmt.Errorf("failed to begin transaction: %w", err)
 	}
@@ -49,16 +41,10 @@ func (s *store) ExecTx(ctx context.Context, fn func(Client) error) error {
 	defer func() {
 		// Safe to ignore; actual failures kill the connection.
 
-		_ = tx.Rollback(ctx)
+		_ = tx.Rollback(context.WithoutCancel(ctx))
 	}()
 
-	txClient := &store{
-		Queries: s.WithTx(tx),
-		pool:    s.pool,
-		inTx:    true,
-	}
-
-	if err := fn(txClient); err != nil {
+	if err := fn(s.WithTx(tx)); err != nil {
 		return err
 	}
 
