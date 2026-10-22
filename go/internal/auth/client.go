@@ -17,14 +17,14 @@ const jwksMinInterval = 10 * time.Minute
 type Client struct {
 	cache *jwk.Cache
 
-	db     db.Client
+	db     *db.Store
 	logger *zap.Logger
 	cfg    Config
 
 	cancel context.CancelFunc
 }
 
-func New(ctx context.Context, db db.Client, logger *zap.Logger, cfg Config) (*Client, error) {
+func New(ctx context.Context, db *db.Store, logger *zap.Logger, cfg Config) (*Client, error) {
 	cacheCtx, cancelCache := context.WithCancel(ctx)
 
 	cache, err := jwk.NewCache(cacheCtx, httprc.NewClient())

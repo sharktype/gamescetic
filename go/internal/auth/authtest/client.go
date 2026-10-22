@@ -52,7 +52,7 @@ func NewSigner(t testing.TB) *Signer {
 	return &Signer{key: key, issuer: "issuer", audience: "audience"}
 }
 
-func New(t testing.TB, db db.Client) *Client {
+func New(t testing.TB, db *db.Store) *Client {
 	t.Helper()
 
 	signer := NewSigner(t)

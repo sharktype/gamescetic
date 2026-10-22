@@ -10,7 +10,7 @@ import (
 )
 
 type Clients struct {
-	DB   db.Client
+	DB   *db.Store
 	Auth *auth.Client
 }
 

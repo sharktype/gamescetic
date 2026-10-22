@@ -235,7 +235,7 @@ func TestBearerToken(t *testing.T) {
 	}
 }
 
-func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Signer) {
+func newTestAPI(t *testing.T, users *db.Store) (humatest.TestAPI, *authtest.Signer) {
 	t.Helper()
 
 	authClient := authtest.New(t, users)
