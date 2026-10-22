@@ -17,8 +17,7 @@ import (
 func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
 	t.Helper()
 
-	database := dbtest.New(t)
-	database.ProvisionUser(t)
+	database, _ := dbtest.Provision(t)
 
 	authClient := authtest.New(t, database)
 

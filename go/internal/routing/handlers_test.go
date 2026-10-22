@@ -199,13 +199,12 @@ func TestHandle(t *testing.T) {
 		core, logs := observer.New(zapcore.ErrorLevel)
 		logger := zap.New(core)
 
-		database := dbtest.New(t)
-		database.ProvisionUser(t)
+		database, _ := dbtest.Provision(t)
 
 		// Auth resolves the user through the live database; the handler pings the closed one.
 
 		authClient := authtest.New(t, database)
-		unavailable := dbtest.Unavailable(t)
+		unavailable := dbtest.NewUnavailable(t)
 
 		cause := unavailable.Ping(t.Context())
 		if cause == nil {

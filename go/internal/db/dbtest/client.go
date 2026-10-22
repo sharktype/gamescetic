@@ -90,6 +90,15 @@ func New(t testing.TB) *Client {
 	}
 }
 
+// Provision returns a client for a new database containing the user with the "sub-1" subject.
+func Provision(t testing.TB) (*Client, generated.User) {
+	t.Helper()
+
+	client := New(t)
+
+	return client, client.insertUser(t)
+}
+
 // serverConfig parses a DSN into pgtestdb's config.
 //
 // The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
@@ -108,26 +117,49 @@ func serverConfig(dsn string) (pgtestdb.Config, error) {
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must be a postgres:// URL")
 	}
 
+	user := parsed.User.Username()
+	password, _ := parsed.User.Password()
+
+	if user == "" {
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a user")
+	}
+
+	if parsed.Hostname() == "" {
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a host")
+	}
+
+	database := strings.TrimPrefix(parsed.Path, "/")
+	if database == "" {
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a database")
+	}
+
+	// pgtestdb reassembles these into its own URL without escaping them, so credentials that need
+	// escaping are rejected instead of being silently mangled.
+
+	if strings.ContainsAny(user+password, ":@/?#%") {
+		return pgtestdb.Config{}, errors.New(
+			"CLIENTS_DB_DSN credentials must not contain : @ / ? # or %",
+		)
+	}
+
 	port := parsed.Port()
 	if port == "" {
 		port = "5432"
 	}
 
-	password, _ := parsed.User.Password()
-
 	return pgtestdb.Config{
 		DriverName: "pgx",
 		Host:       parsed.Hostname(),
 		Port:       port,
-		User:       parsed.User.Username(),
+		User:       user,
 		Password:   password,
-		Database:   strings.TrimPrefix(parsed.Path, "/"),
+		Database:   database,
 		Options:    parsed.RawQuery,
 	}, nil
 }
 
-// Unavailable returns a client whose every call fails, standing in for an unreachable database.
-func Unavailable(t testing.TB) *db.Store {
+// NewUnavailable returns a client whose every call fails, standing in for an unreachable database.
+func NewUnavailable(t testing.TB) *db.Store {
 	t.Helper()
 
 	pool, err := pgxpool.New(t.Context(), "postgres://closed")
@@ -140,21 +172,19 @@ func Unavailable(t testing.TB) *db.Store {
 	return db.New(pool)
 }
 
-// ProvisionUser inserts the user every test token's "sub-1" resolves to.
-func (c *Client) ProvisionUser(t testing.TB) generated.User {
+// insertUser inserts the user every test token's "sub-1" resolves to and returns it as stored.
+func (c *Client) insertUser(t testing.TB) generated.User {
 	t.Helper()
 
-	user := generated.User{
-		ID:    "user-1",
-		Sub:   "sub-1",
-		Name:  "Ada Lovelace",
-		Email: "ada-lovelace@example.com",
-	}
+	var user generated.User
 
-	_, err := c.pool.Exec(
+	err := c.pool.QueryRow(
 		t.Context(),
-		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)`,
-		user.ID, user.Sub, user.Name, user.Email,
+		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)
+		RETURNING id, sub, name, email, avatar_url, created_at, updated_at`,
+		"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com",
+	).Scan(
+		&user.ID, &user.Sub, &user.Name, &user.Email, &user.AvatarUrl, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		t.Fatal(err)

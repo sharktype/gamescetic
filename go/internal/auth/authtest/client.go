@@ -22,13 +22,25 @@ import (
 // Client is an auth.Client verifying tokens from a throwaway IDP, which it also signs them with.
 type Client struct {
 	*auth.Client
-
-	signingKey jwk.Key
-	issuer     string
-	audience   string
+	*Signer
 }
 
-func New(t *testing.T, db db.Client) *Client {
+// Signer mints tokens for a throwaway IDP.
+type Signer struct {
+	key      jwk.Key
+	keys     jwk.Set
+	issuer   string
+	audience string
+}
+
+// NewUntrustedSigner creates a signer whose key no auth.Client trusts.
+func NewUntrustedSigner(t testing.TB) *Signer {
+	t.Helper()
+
+	return newSigner(t)
+}
+
+func newSigner(t testing.TB) *Signer {
 	t.Helper()
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -36,21 +48,53 @@ func New(t *testing.T, db db.Client) *Client {
 		t.Fatal(err)
 	}
 
-	signingKey, err := jwk.Import(privateKey)
+	key, err := jwk.Import(privateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := signingKey.Set(jwk.KeyIDKey, "test-kid"); err != nil {
+	if err := key.Set(jwk.KeyIDKey, "test-kid"); err != nil {
 		t.Fatal(err)
 	}
 
-	set := jwk.NewSet()
-	if err := set.AddKey(signingKey); err != nil {
+	keys := jwk.NewSet()
+	if err := keys.AddKey(key); err != nil {
 		t.Fatal(err)
 	}
 
-	publicSet, err := jwk.PublicSetOf(set)
+	return &Signer{key: key, keys: keys, issuer: "issuer", audience: "audience"}
+}
+
+func New(t testing.TB, db db.Client) *Client {
+	t.Helper()
+
+	signer := newSigner(t)
+	jwks := signer.publicJWKS(t)
+
+	server := httptest.NewServer(
+		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+			_, _ = writer.Write(jwks)
+		}),
+	)
+	t.Cleanup(server.Close)
+
+	authClient, err := auth.New(
+		t.Context(),
+		db,
+		zap.NewNop(),
+		auth.Config{JWKSURL: server.URL, Issuer: signer.issuer, Audience: signer.audience},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return &Client{Client: authClient, Signer: signer}
+}
+
+func (s *Signer) publicJWKS(t testing.TB) []byte {
+	t.Helper()
+
+	publicSet, err := jwk.PublicSetOf(s.keys)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,41 +104,16 @@ func New(t *testing.T, db db.Client) *Client {
 		t.Fatal(err)
 	}
 
-	server := httptest.NewServer(
-		http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
-			_, _ = writer.Write(jwks)
-		}),
-	)
-	t.Cleanup(server.Close)
-
-	issuer := "issuer"
-	audience := "audience"
-
-	authClient, err := auth.New(
-		t.Context(),
-		db,
-		zap.NewNop(),
-		auth.Config{JWKSURL: server.URL, Issuer: issuer, Audience: audience},
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return &Client{
-		Client:     authClient,
-		signingKey: signingKey,
-		issuer:     issuer,
-		audience:   audience,
-	}
+	return jwks
 }
 
-func (c *Client) Token(t *testing.T, sub string) string {
+func (s *Signer) Token(t testing.TB, sub string) string {
 	t.Helper()
 
-	return c.TokenWithScopes(t, sub, nil)
+	return s.TokenWithScopes(t, sub, nil)
 }
 
-func (c *Client) TokenWithScopes(t *testing.T, sub string, scopes []string) string {
+func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) string {
 	t.Helper()
 
 	token := jwt.New()
@@ -103,11 +122,11 @@ func (c *Client) TokenWithScopes(t *testing.T, sub string, scopes []string) stri
 		t.Fatal(err)
 	}
 
-	if err := token.Set(jwt.IssuerKey, c.issuer); err != nil {
+	if err := token.Set(jwt.IssuerKey, s.issuer); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := token.Set(jwt.AudienceKey, []string{c.audience}); err != nil {
+	if err := token.Set(jwt.AudienceKey, []string{s.audience}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -121,7 +140,7 @@ func (c *Client) TokenWithScopes(t *testing.T, sub string, scopes []string) stri
 		}
 	}
 
-	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), c.signingKey))
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.ES256(), s.key))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -73,17 +73,10 @@ tasks:
 
     test:
         command: "go test ./..."
-        deps:
-            - "test-clean"
         inputs:
             - "@group(configs)"
             - "@group(sources)"
             - "@group(tests)"
-
-    test-clean:
-        command: "go run ./cmd/test-clean"
-        options:
-            cache: false
 
     migrate:
         command: "goose -dir sql/migrations up"
