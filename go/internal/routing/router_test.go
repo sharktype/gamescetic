@@ -84,7 +84,7 @@ func TestNewAPI(t *testing.T) {
 		api := newTestAPI(t)
 		handler := authtest.RegisterProbe(api.secured, authtest.RequireJWT("posts:read"))
 
-		token := api.signer.Token(t, dbtest.ProvisionedUser.Sub)
+		token := api.signer.Token(t, dbtest.ProvisionedUser().Sub)
 
 		code := get(api.router, authtest.ProbePath, "Bearer "+token).Code
 		if code != http.StatusForbidden {

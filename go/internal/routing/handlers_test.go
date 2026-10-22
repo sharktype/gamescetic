@@ -44,7 +44,7 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("auth health answers with the user", func(t *testing.T) {
-		user := dbtest.ProvisionedUser
+		user := dbtest.ProvisionedUser()
 
 		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
@@ -138,7 +138,7 @@ func TestHandle(t *testing.T) {
 		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
 		code := get(
-			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser.Sub),
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
 		).Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
@@ -166,7 +166,7 @@ func TestHandle(t *testing.T) {
 		}
 
 		code := get(
-			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser.Sub),
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
 		).Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
@@ -220,7 +220,7 @@ func TestHandle(t *testing.T) {
 		)
 
 		response := get(
-			router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedUser.Sub),
+			router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedUser().Sub),
 		)
 		if response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)

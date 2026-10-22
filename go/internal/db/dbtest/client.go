@@ -20,14 +20,6 @@ import (
 	"github.com/sharktype/satchel/sql"
 )
 
-// ProvisionedUser is the user Provision inserts. Only its ID, Sub, Name, and Email are stored.
-var ProvisionedUser = generated.User{
-	ID:    "user-1",
-	Sub:   "sub-1",
-	Name:  "Ada Lovelace",
-	Email: "ada-lovelace@example.com",
-}
-
 var migrator = goosemigrator.New("migrations", goosemigrator.WithFS(sql.Migrations))
 
 var loadServerConfig = sync.OnceValues(func() (pgtestdb.Config, error) {
@@ -65,19 +57,20 @@ func New(t testing.TB) *db.Store {
 	return db.New(newPool(t))
 }
 
-// Provision returns a client for a new database containing ProvisionedUser.
+// Provision returns a client for a new database containing the user from ProvisionedUser.
 func Provision(t testing.TB) *db.Store {
 	t.Helper()
 
 	pool := newPool(t)
+	user := ProvisionedUser()
 
 	_, err := pool.Exec(
 		t.Context(),
 		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)`,
-		ProvisionedUser.ID,
-		ProvisionedUser.Sub,
-		ProvisionedUser.Name,
-		ProvisionedUser.Email,
+		user.ID,
+		user.Sub,
+		user.Name,
+		user.Email,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -86,7 +79,17 @@ func Provision(t testing.TB) *db.Store {
 	return db.New(pool)
 }
 
-// NewClosed returns a client whose every call fails, standing in for an unreachable database.
+// ProvisionedUser returns the user Provision inserts. Only ID, Sub, Name, and Email are set.
+func ProvisionedUser() generated.User {
+	return generated.User{
+		ID:    "user-1",
+		Sub:   "sub-1",
+		Name:  "Ada Lovelace",
+		Email: "ada-lovelace@example.com",
+	}
+}
+
+// NewClosed returns a client whose pool is already closed, so every call fails.
 func NewClosed(t testing.TB) *db.Store {
 	t.Helper()
 
