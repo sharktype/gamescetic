@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
+	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
 func TestNewAPI(t *testing.T) {
@@ -83,7 +84,9 @@ func TestNewAPI(t *testing.T) {
 		api := newTestAPI(t)
 		handler := authtest.RegisterProbe(api.secured, authtest.RequireJWT("posts:read"))
 
-		code := get(api.router, authtest.ProbePath, "Bearer "+api.client.Token(t, "sub-1")).Code
+		code := get(
+			api.router, authtest.ProbePath, "Bearer "+api.client.Token(t, dbtest.ProvisionedSub),
+		).Code
 		if code != http.StatusForbidden {
 			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
 		}

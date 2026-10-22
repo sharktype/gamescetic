@@ -46,7 +46,9 @@ func TestHandle(t *testing.T) {
 	t.Run("auth health answers with the user", func(t *testing.T) {
 		router, authClient := newHandledRouter(t)
 
-		response := get(router, "/health/auth", "Bearer "+authClient.Token(t, "sub-1"))
+		response := get(
+			router, "/health/auth", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
+		)
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -138,7 +140,9 @@ func TestHandle(t *testing.T) {
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
 		router, authClient := newHandledRouter(t)
 
-		code := get(router, "/health/error", "Bearer "+authClient.Token(t, "sub-1")).Code
+		code := get(
+			router, "/health/error", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
+		).Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
 		}
@@ -164,7 +168,9 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		code := get(router, "/health/error", "Bearer "+authClient.Token(t, "sub-1")).Code
+		code := get(
+			router, "/health/error", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
+		).Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
 		}
@@ -219,7 +225,7 @@ func TestHandle(t *testing.T) {
 			huma.DefaultConfig("test", "1"),
 		)
 
-		response := get(router, "/health/db", "Bearer "+authClient.Token(t, "sub-1"))
+		response := get(router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub))
 		if response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}

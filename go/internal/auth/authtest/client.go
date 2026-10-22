@@ -25,22 +25,14 @@ type Client struct {
 	*Signer
 }
 
-// Signer mints tokens for a throwaway IDP.
+// Signer mints tokens for a throwaway IDP. Only the auth.Client built around it by New trusts it.
 type Signer struct {
 	key      jwk.Key
-	keys     jwk.Set
 	issuer   string
 	audience string
 }
 
-// NewUntrustedSigner creates a signer whose key no auth.Client trusts.
-func NewUntrustedSigner(t testing.TB) *Signer {
-	t.Helper()
-
-	return newSigner(t)
-}
-
-func newSigner(t testing.TB) *Signer {
+func NewSigner(t testing.TB) *Signer {
 	t.Helper()
 
 	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
@@ -57,18 +49,13 @@ func newSigner(t testing.TB) *Signer {
 		t.Fatal(err)
 	}
 
-	keys := jwk.NewSet()
-	if err := keys.AddKey(key); err != nil {
-		t.Fatal(err)
-	}
-
-	return &Signer{key: key, keys: keys, issuer: "issuer", audience: "audience"}
+	return &Signer{key: key, issuer: "issuer", audience: "audience"}
 }
 
 func New(t testing.TB, db db.Client) *Client {
 	t.Helper()
 
-	signer := newSigner(t)
+	signer := NewSigner(t)
 	jwks := signer.publicJWKS(t)
 
 	server := httptest.NewServer(
@@ -94,8 +81,13 @@ func New(t testing.TB, db db.Client) *Client {
 func (s *Signer) publicJWKS(t testing.TB) []byte {
 	t.Helper()
 
-	publicSet, err := jwk.PublicSetOf(s.keys)
+	publicKey, err := jwk.PublicKeyOf(s.key)
 	if err != nil {
+		t.Fatal(err)
+	}
+
+	publicSet := jwk.NewSet()
+	if err := publicSet.AddKey(publicKey); err != nil {
 		t.Fatal(err)
 	}
 
