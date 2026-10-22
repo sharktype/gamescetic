@@ -13,12 +13,12 @@ import (
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a verified token resolves the user by its subject", func(t *testing.T) {
-		database, row := dbtest.Provision(t)
+		row := dbtest.ProvisionedUser
 
-		api, authClient := newTestAPI(t, database)
+		api, signer := newTestAPI(t, dbtest.Provision(t))
 		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
-		token := authClient.Token(t, row.Sub)
+		token := signer.Token(t, row.Sub)
 
 		code := api.Get(authtest.ProbePath, "Authorization: Bearer "+token).Code
 		if code != http.StatusOK {
@@ -37,51 +37,41 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		}
 	})
 
-	provisioned := func(t *testing.T) db.Client {
-		database, _ := dbtest.Provision(t)
-
-		return database
-	}
-
-	unavailable := func(t *testing.T) db.Client {
-		return dbtest.NewUnavailable(t)
-	}
-
 	rejections := []struct {
 		name           string
-		database       func(t *testing.T) db.Client
-		token          func(t *testing.T, authClient *authtest.Client) string
+		database       func(testing.TB) *db.Store
+		token          func(t *testing.T, signer *authtest.Signer) string
 		expectedStatus int
 	}{
 		{
 			name:     "a token signed by another key is rejected",
-			database: provisioned,
-			token: func(t *testing.T, _ *authtest.Client) string {
-				return authtest.NewSigner(t).Token(t, dbtest.ProvisionedSub)
+			database: dbtest.NewClosed,
+			token: func(t *testing.T, _ *authtest.Signer) string {
+				return authtest.NewSigner(t).Token(t, dbtest.ProvisionedUser.Sub)
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:     "a token without a subject is rejected",
-			database: provisioned,
-			token: func(t *testing.T, client *authtest.Client) string {
-				return client.Token(t, "")
+			database: dbtest.NewClosed,
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.Token(t, "")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:     "a subject that is not the provisioned user is forbidden",
-			database: provisioned,
-			token: func(t *testing.T, client *authtest.Client) string {
-				return client.Token(t, "sub-2")
+			database: dbtest.Provision,
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.Token(t, "sub-2")
 			},
 			expectedStatus: http.StatusForbidden,
 		},
 		{
 			name:     "a failing user lookup is an internal error",
-			database: unavailable,
-			token: func(t *testing.T, client *authtest.Client) string {
-				return client.Token(t, dbtest.ProvisionedSub)
+			database: dbtest.NewClosed,
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.Token(t, dbtest.ProvisionedUser.Sub)
 			},
 			expectedStatus: http.StatusInternalServerError,
 		},
@@ -89,11 +79,11 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			api, authClient := newTestAPI(t, test.database(t))
+			api, signer := newTestAPI(t, test.database(t))
 			probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			code := api.Get(
-				authtest.ProbePath, "Authorization: Bearer "+test.token(t, authClient),
+				authtest.ProbePath, "Authorization: Bearer "+test.token(t, signer),
 			).Code
 			if code != test.expectedStatus {
 				t.Fatalf("got %d, want %d", code, test.expectedStatus)
@@ -149,12 +139,10 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				database, _ := dbtest.Provision(t)
-
-				api, authClient := newTestAPI(t, database)
+				api, signer := newTestAPI(t, dbtest.Provision(t))
 				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
-				token := authClient.TokenWithScopes(t, dbtest.ProvisionedSub, test.granted)
+				token := signer.TokenWithScopes(t, dbtest.ProvisionedUser.Sub, test.granted)
 
 				code := api.Get(authtest.ProbePath, "Authorization: Bearer "+token).Code
 				if code != test.expectedStatus {
@@ -218,9 +206,7 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			database, _ := dbtest.Provision(t)
-
-			api, authClient := newTestAPI(t, database)
+			api, signer := newTestAPI(t, dbtest.Provision(t))
 			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			if test.authorization == nil {
@@ -231,7 +217,7 @@ func TestBearerToken(t *testing.T) {
 				return
 			}
 
-			authorization := test.authorization(authClient.Token(t, dbtest.ProvisionedSub))
+			authorization := test.authorization(signer.Token(t, dbtest.ProvisionedUser.Sub))
 
 			code := api.Get(authtest.ProbePath, "Authorization: "+authorization).Code
 			if code != test.expectedStatus {
@@ -241,7 +227,7 @@ func TestBearerToken(t *testing.T) {
 	}
 }
 
-func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Client) {
+func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Signer) {
 	t.Helper()
 
 	authClient := authtest.New(t, users)
@@ -250,5 +236,5 @@ func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Clie
 
 	api.UseMiddleware(authClient.Middleware(api))
 
-	return api, authClient
+	return api, authClient.Signer
 }

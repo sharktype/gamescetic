@@ -21,7 +21,7 @@ import (
 
 func TestHandle(t *testing.T) {
 	t.Run("the specification documents every operation", func(t *testing.T) {
-		router, _ := newHandledRouter(t)
+		router, _ := newHandledRouter(t, dbtest.NewClosed(t))
 		response := get(router, "/openapi.json", "")
 
 		if response.Code != http.StatusOK {
@@ -44,11 +44,11 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("auth health answers with the user", func(t *testing.T) {
-		router, authClient := newHandledRouter(t)
+		user := dbtest.ProvisionedUser
 
-		response := get(
-			router, "/health/auth", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
-		)
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
+
+		response := get(router, "/health/auth", "Bearer "+signer.Token(t, user.Sub))
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -62,12 +62,9 @@ func TestHandle(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if body.Message != "user-1 (Ada Lovelace, ada-lovelace@example.com) OK" {
-			t.Fatalf(
-				"got %q, want %q",
-				body.Message,
-				"user-1 (Ada Lovelace, ada-lovelace@example.com) OK",
-			)
+		expected := fmt.Sprintf("%s (%s, %s) OK", user.ID, user.Name, user.Email)
+		if body.Message != expected {
+			t.Fatalf("got %q, want %q", body.Message, expected)
 		}
 	})
 
@@ -138,10 +135,10 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		router, authClient := newHandledRouter(t)
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
 		code := get(
-			router, "/health/error", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser.Sub),
 		).Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
@@ -156,7 +153,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router, authClient := newHandledRouter(t)
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
 		for i := range publicRateLimit {
 			if code := get(router, "/health", "").Code; code != http.StatusOK {
@@ -169,7 +166,7 @@ func TestHandle(t *testing.T) {
 		}
 
 		code := get(
-			router, "/health/error", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub),
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser.Sub),
 		).Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
@@ -184,7 +181,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router, _ := newHandledRouter(t)
+		router, _ := newHandledRouter(t, dbtest.NewClosed(t))
 
 		for i := range securedRateLimit {
 			if code := get(
@@ -205,12 +202,10 @@ func TestHandle(t *testing.T) {
 		core, logs := observer.New(zapcore.ErrorLevel)
 		logger := zap.New(core)
 
-		database, _ := dbtest.Provision(t)
-
 		// Auth resolves the user through the live database; the handler pings the closed one.
 
-		authClient := authtest.New(t, database)
-		unavailable := dbtest.NewUnavailable(t)
+		authClient := authtest.New(t, dbtest.Provision(t))
+		unavailable := dbtest.NewClosed(t)
 
 		cause := unavailable.Ping(t.Context())
 		if cause == nil {
@@ -225,7 +220,9 @@ func TestHandle(t *testing.T) {
 			huma.DefaultConfig("test", "1"),
 		)
 
-		response := get(router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedSub))
+		response := get(
+			router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedUser.Sub),
+		)
 		if response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}

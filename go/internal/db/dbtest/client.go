@@ -20,8 +20,13 @@ import (
 	"github.com/sharktype/satchel/sql"
 )
 
-// ProvisionedSub is the subject of the user Provision inserts.
-const ProvisionedSub = "sub-1"
+// ProvisionedUser is the user Provision inserts. Only its ID, Sub, Name, and Email are stored.
+var ProvisionedUser = generated.User{
+	ID:    "user-1",
+	Sub:   "sub-1",
+	Name:  "Ada Lovelace",
+	Email: "ada-lovelace@example.com",
+}
 
 var migrator = goosemigrator.New("migrations", goosemigrator.WithFS(sql.Migrations))
 
@@ -41,6 +46,8 @@ var loadServerConfig = sync.OnceValues(func() (pgtestdb.Config, error) {
 		return pgtestdb.Config{}, fmt.Errorf("load .env: %w", err)
 	}
 
+	// A test suite passing without database-enabled tests passing proves exactly nothing.
+
 	dsn := os.Getenv("CLIENTS_DB_TEST_DSN")
 	if dsn == "" {
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
@@ -58,8 +65,8 @@ func New(t testing.TB) *db.Store {
 	return db.New(newPool(t))
 }
 
-// Provision returns a client for a new database containing the user with a constant subject.
-func Provision(t testing.TB) (*db.Store, generated.User) {
+// Provision returns a client for a new database containing ProvisionedUser.
+func Provision(t testing.TB) *db.Store {
 	t.Helper()
 
 	pool := newPool(t)
@@ -67,24 +74,20 @@ func Provision(t testing.TB) (*db.Store, generated.User) {
 	_, err := pool.Exec(
 		t.Context(),
 		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)`,
-		"user-1", ProvisionedSub, "Ada Lovelace", "ada-lovelace@example.com",
+		ProvisionedUser.ID,
+		ProvisionedUser.Sub,
+		ProvisionedUser.Name,
+		ProvisionedUser.Email,
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	store := db.New(pool)
-
-	user, err := store.GetUserBySub(t.Context(), ProvisionedSub)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return store, user
+	return db.New(pool)
 }
 
-// NewUnavailable returns a client whose every call fails, standing in for an unreachable database.
-func NewUnavailable(t testing.TB) *db.Store {
+// NewClosed returns a client whose every call fails, standing in for an unreachable database.
+func NewClosed(t testing.TB) *db.Store {
 	t.Helper()
 
 	pool, err := pgxpool.New(t.Context(), "postgres://closed")

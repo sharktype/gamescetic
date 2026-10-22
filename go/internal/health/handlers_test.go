@@ -23,7 +23,7 @@ func TestGetDatabaseHealth(t *testing.T) {
 	})
 
 	t.Run("a failing check returns a fixed 503 that keeps the cause", func(t *testing.T) {
-		_, err := GetDatabaseHealth(dbtest.NewUnavailable(t))(t.Context(), &GetHealthInput{})
+		_, err := GetDatabaseHealth(dbtest.NewClosed(t))(t.Context(), &GetHealthInput{})
 		if err == nil {
 			t.Fatal("expected an error")
 		}
