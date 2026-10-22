@@ -115,7 +115,7 @@ func TestIsProduction(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		production, err := isProduction()
+		production, err := IsProduction()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestIsProduction(t *testing.T) {
 	t.Run(`"1" is production`, func(t *testing.T) {
 		t.Setenv("PRODUCTION", "1")
 
-		production, err := isProduction()
+		production, err := IsProduction()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestIsProduction(t *testing.T) {
 		t.Run("rejects "+test.name, func(t *testing.T) {
 			t.Setenv("PRODUCTION", test.value)
 
-			if _, err := isProduction(); err == nil {
+			if _, err := IsProduction(); err == nil {
 				t.Fatalf("expected an error for %q", test.value)
 			}
 		})
