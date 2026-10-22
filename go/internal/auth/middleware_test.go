@@ -1,7 +1,6 @@
 package auth_test
 
 import (
-	"errors"
 	"net/http"
 	"testing"
 
@@ -12,20 +11,12 @@ import (
 	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
-func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Client) {
-	t.Helper()
-
-	authClient := authtest.New(t, users)
-
-	_, api := humatest.New(t)
-	api.UseMiddleware(authClient.Middleware(api))
-
-	return api, authClient
-}
-
 func TestNewJWTAuthMiddleware(t *testing.T) {
 	t.Run("a verified token resolves the user by its subject", func(t *testing.T) {
-		api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser()})
+		database := dbtest.New(t)
+		row := database.ProvisionUser(t)
+
+		api, authClient := newTestAPI(t, database)
 		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 		token := authClient.Token(t, "sub-1")
@@ -35,7 +26,6 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusOK)
 		}
 
-		row := dbtest.ProvisionedUser()
 		expected := auth.User{
 			ID:    row.ID,
 			Sub:   row.Sub,
@@ -50,23 +40,21 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 	rejections := []struct {
 		name           string
-		users          db.Client
+		users          func(t *testing.T) db.Client
 		token          func(t *testing.T, authClient *authtest.Client) string
 		expectedStatus int
 	}{
 		{
 			name:  "a token signed by another key is rejected",
-			users: &dbtest.Stub{User: dbtest.ProvisionedUser()},
+			users: newProvisionedUserDB,
 			token: func(t *testing.T, _ *authtest.Client) string {
-				return authtest.New(
-					t, &dbtest.Stub{User: dbtest.ProvisionedUser()},
-				).Token(t, "sub-1")
+				return authtest.New(t, newUnreachableDB(t)).Token(t, "sub-1")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:  "a token without a subject is rejected",
-			users: &dbtest.Stub{User: dbtest.ProvisionedUser()},
+			users: newProvisionedUserDB,
 			token: func(t *testing.T, client *authtest.Client) string {
 				return client.Token(t, "")
 			},
@@ -74,7 +62,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		},
 		{
 			name:  "a subject that is not the provisioned user is forbidden",
-			users: &dbtest.Stub{User: dbtest.ProvisionedUser()},
+			users: newProvisionedUserDB,
 			token: func(t *testing.T, client *authtest.Client) string {
 				return client.Token(t, "sub-2")
 			},
@@ -82,7 +70,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		},
 		{
 			name:  "a failing user lookup is an internal error",
-			users: &dbtest.Stub{UserErr: errors.New("arbitrary error")},
+			users: newUnreachableDB,
 			token: func(t *testing.T, client *authtest.Client) string {
 				return client.Token(t, "sub-1")
 			},
@@ -92,7 +80,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			api, authClient := newTestAPI(t, test.users)
+			api, authClient := newTestAPI(t, test.users(t))
 			probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			code := api.Get(
@@ -152,7 +140,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser()})
+				api, authClient := newTestAPI(t, newProvisionedUserDB(t))
 				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
 				token := authClient.TokenWithScopes(t, "sub-1", test.granted)
@@ -219,7 +207,7 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api, authClient := newTestAPI(t, &dbtest.Stub{User: dbtest.ProvisionedUser()})
+			api, authClient := newTestAPI(t, newProvisionedUserDB(t))
 			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			if test.authorization == nil {
@@ -238,4 +226,31 @@ func TestBearerToken(t *testing.T) {
 			}
 		})
 	}
+}
+
+func newTestAPI(t *testing.T, users db.Client) (humatest.TestAPI, *authtest.Client) {
+	t.Helper()
+
+	authClient := authtest.New(t, users)
+
+	_, api := humatest.New(t)
+
+	api.UseMiddleware(authClient.Middleware(api))
+
+	return api, authClient
+}
+
+func newProvisionedUserDB(t *testing.T) db.Client {
+	t.Helper()
+
+	database := dbtest.New(t)
+	database.ProvisionUser(t)
+
+	return database
+}
+
+func newUnreachableDB(t *testing.T) db.Client {
+	t.Helper()
+
+	return dbtest.Unavailable(t)
 }

@@ -9,25 +9,20 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
 )
 
-// "provisioned" means stubbed rather than using the real test database.
-
-func provisionedUsers() db.Client {
-	return &dbtest.Stub{User: dbtest.ProvisionedUser()}
-}
-
 func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
 	t.Helper()
 
-	users := provisionedUsers()
-	authClient := authtest.New(t, users)
+	database := dbtest.New(t)
+	database.ProvisionUser(t)
 
-	return &clients.Clients{DB: users, Auth: authClient.Client}, authClient
+	authClient := authtest.New(t, database)
+
+	return &clients.Clients{DB: database, Auth: authClient.Client}, authClient
 }
 
 type testAPI struct {

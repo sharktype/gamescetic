@@ -74,11 +74,16 @@ tasks:
     test:
         command: "go test ./..."
         deps:
-            - "migrate-test"
+            - "test-clean"
         inputs:
             - "@group(configs)"
             - "@group(sources)"
             - "@group(tests)"
+
+    test-clean:
+        command: "go run ./cmd/test-clean"
+        options:
+            cache: false
 
     migrate:
         command: "goose -dir sql/migrations up"
@@ -87,12 +92,6 @@ tasks:
     migrate-down:
         command: "goose -dir sql/migrations down"
         preset: "utility"
-
-    migrate-test:
-        command: 'goose -dir sql/migrations postgres "$CLIENTS_DB_TEST_DSN" up'
-        options:
-            cache: false
-            envFile: true
 
     migration-create:
         command: "goose"

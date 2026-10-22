@@ -196,19 +196,27 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a failing dependency logs its cause", func(t *testing.T) {
-		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
-
 		core, logs := observer.New(zapcore.ErrorLevel)
 		logger := zap.New(core)
 
-		users := &dbtest.Stub{User: dbtest.ProvisionedUser(), PingErr: cause}
-		authClient := authtest.New(t, users)
+		database := dbtest.New(t)
+		database.ProvisionUser(t)
+
+		// Auth resolves the user through the live database; the handler pings the closed one.
+
+		authClient := authtest.New(t, database)
+		unavailable := dbtest.Unavailable(t)
+
+		cause := unavailable.Ping(t.Context())
+		if cause == nil {
+			t.Fatal("expected the closed database to fail")
+		}
 
 		router := testRouterWithLogger(t, logger)
 		Handle(
 			logger,
 			router,
-			&clients.Clients{DB: users, Auth: authClient.Client},
+			&clients.Clients{DB: unavailable, Auth: authClient.Client},
 			huma.DefaultConfig("test", "1"),
 		)
 
@@ -217,7 +225,7 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}
 
-		if strings.Contains(response.Body.String(), "connection refused") {
+		if strings.Contains(response.Body.String(), cause.Error()) {
 			t.Fatalf("the response leaks the cause: %q", response.Body.String())
 		}
 
@@ -227,7 +235,7 @@ func TestHandle(t *testing.T) {
 		}
 
 		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "connection refused",
+			logged, cause.Error(),
 		) {
 			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
