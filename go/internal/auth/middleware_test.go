@@ -100,6 +100,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		tests := []struct {
 			name           string
+			database       func(testing.TB) *db.Store
 			declared       []string
 			granted        []string
 			expectedStatus int
@@ -107,11 +108,13 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		}{
 			{
 				name:           "no scopes declared",
+				database:       dbtest.Provision,
 				expectedStatus: http.StatusOK,
 				expectedIsRun:  true,
 			},
 			{
 				name:           "all declared scopes granted",
+				database:       dbtest.Provision,
 				declared:       []string{"posts:read", "posts:write"},
 				granted:        []string{"posts:read", "posts:write"},
 				expectedStatus: http.StatusOK,
@@ -119,6 +122,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			},
 			{
 				name:           "extra scopes are fine",
+				database:       dbtest.Provision,
 				declared:       []string{"posts:read"},
 				granted:        []string{"posts:read", "admin"},
 				expectedStatus: http.StatusOK,
@@ -126,12 +130,14 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			},
 			{
 				name:           "one of two declared scopes is not enough",
+				database:       dbtest.NewClosed,
 				declared:       []string{"posts:read", "posts:write"},
 				granted:        []string{"posts:read"},
 				expectedStatus: http.StatusForbidden,
 			},
 			{
 				name:           "no scopes claim",
+				database:       dbtest.NewClosed,
 				declared:       []string{"posts:read"},
 				expectedStatus: http.StatusForbidden,
 			},
@@ -139,7 +145,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				api, signer := newTestAPI(t, dbtest.Provision(t))
+				api, signer := newTestAPI(t, test.database(t))
 				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
 				token := signer.TokenWithScopes(t, dbtest.ProvisionedUser.Sub, test.granted)
@@ -160,45 +166,54 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 func TestBearerToken(t *testing.T) {
 	tests := []struct {
 		name           string
+		database       func(testing.TB) *db.Store
 		authorization  func(token string) string
 		expectedStatus int
 	}{
 		{
 			name:           "bearer scheme",
+			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "Bearer " + token },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "scheme is case insensitive",
+			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "bearer " + token },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "surrounding whitespace is trimmed",
+			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "Bearer   " + token + " " },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "missing scheme",
+			database:       dbtest.NewClosed,
 			authorization:  func(token string) string { return token },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "other scheme",
+			database:       dbtest.NewClosed,
 			authorization:  func(token string) string { return "Basic " + token },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "empty header",
+			database:       dbtest.NewClosed,
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "scheme without a token",
+			database:       dbtest.NewClosed,
 			authorization:  func(string) string { return "Bearer " },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "embedded whitespace",
+			database:       dbtest.NewClosed,
 			authorization:  func(string) string { return "Bearer foo bar" },
 			expectedStatus: http.StatusUnauthorized,
 		},
@@ -206,7 +221,7 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api, signer := newTestAPI(t, dbtest.Provision(t))
+			api, signer := newTestAPI(t, test.database(t))
 			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			if test.authorization == nil {
