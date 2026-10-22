@@ -1,193 +1,86 @@
 package dbtest
 
 import (
+	"cmp"
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
-	"github.com/joho/godotenv"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/goosemigrator"
 	"github.com/sharktype/satchel/generated"
+	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/sql"
 )
 
-type Client struct {
-	*db.Store
+// ProvisionedSub is the subject of the user Provision inserts.
+const ProvisionedSub = "sub-1"
 
-	pool *pgxpool.Pool
-}
+var migrator = goosemigrator.New("migrations", goosemigrator.WithFS(sql.Migrations))
 
-type server struct {
-	config   pgtestdb.Config
-	migrator pgtestdb.Migrator
-}
-
-var loadServer = sync.OnceValues(func() (server, error) {
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		return server{}, errors.New("failed to locate dbtest")
-	}
-
-	// Yes, this is ugly, but it gets us reliably to root and fails otherwise, with no destructive
-	// side effects, so it's reasonable enough to not write helper functions.
-
-	root := filepath.Join(filepath.Dir(file), "..", "..", "..")
-
-	err := godotenv.Load(filepath.Join(root, ".env"))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return server{}, fmt.Errorf("load .env: %w", err)
-	}
-
-	config, err := testConfig(
-		os.Getenv("CLIENTS_DB_TEST_DSN"),
-		os.Getenv("CLIENTS_DB_DSN"),
-		os.Getenv("PRODUCTION") != "",
-	)
+var loadServerConfig = sync.OnceValues(func() (pgtestdb.Config, error) {
+	production, err := config.IsProduction()
 	if err != nil {
-		return server{}, err
+		return pgtestdb.Config{}, err
 	}
 
-	return server{
-		config: config,
-		migrator: goosemigrator.New(
-			"migrations", goosemigrator.WithFS(os.DirFS(filepath.Join(root, "sql"))),
-		),
-	}, nil
-})
-
-// New returns a client for a fresh, migrated database.
-//
-// The database is dropped if the test passes and kept for inspection if it fails (logs for trace).
-func New(t testing.TB) *Client {
-	t.Helper()
-
-	srv, err := loadServer()
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	instance := pgtestdb.Custom(t, srv.config, srv.migrator)
-
-	pool, err := pgxpool.New(t.Context(), instance.URL())
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Cleanup runs functions in reverse order of registration, which means the pool closes before
-	// pgtestdb cleans up (and therefore drops) the database. Postgres will not allow dropping a
-	// database that still has test peeps connected to it.
-
-	t.Cleanup(pool.Close)
-
-	return &Client{
-		Store: db.New(pool),
-		pool:  pool,
-	}
-}
-
-// Provision returns a client for a new database containing the user with the "sub-1" subject.
-func Provision(t testing.TB) (*Client, generated.User) {
-	t.Helper()
-
-	client := New(t)
-
-	return client, client.insertUser(t)
-}
-
-// testConfig refuses to guess which database tests may create databases on.
-func testConfig(testDSN, appDSN string, production bool) (pgtestdb.Config, error) {
 	if production {
 		return pgtestdb.Config{}, errors.New(
 			"refusing to create test databases while PRODUCTION is set",
 		)
 	}
 
-	if testDSN == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
+	if err := config.LoadEnv(); err != nil {
+		return pgtestdb.Config{}, fmt.Errorf("load .env: %w", err)
 	}
 
-	// Overkill to compare schemes etc
-
-	if testDSN == appDSN {
-		return pgtestdb.Config{}, errors.New(
-			"CLIENTS_DB_TEST_DSN must differ from CLIENTS_DB_DSN",
-		)
-	}
-
-	return serverConfig(testDSN)
-}
-
-// serverConfig parses a DSN into pgtestdb's config.
-//
-// The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
-// only true for environments where the tests have to run; production environments should have
-// the DB user scoped to a specific database.
-func serverConfig(dsn string) (pgtestdb.Config, error) {
+	dsn := os.Getenv("CLIENTS_DB_TEST_DSN")
 	if dsn == "" {
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
 	}
 
-	parsed, err := url.Parse(dsn)
-	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must be a postgres:// URL")
+	return serverConfig(dsn)
+})
+
+// New returns a client for a fresh, migrated database.
+//
+// The database is dropped if the test passes and kept for inspection if it fails (logs for trace).
+func New(t testing.TB) *db.Store {
+	t.Helper()
+
+	return db.New(newPool(t))
+}
+
+// Provision returns a client for a new database containing the user with a constant subject.
+func Provision(t testing.TB) (*db.Store, generated.User) {
+	t.Helper()
+
+	pool := newPool(t)
+
+	_, err := pool.Exec(
+		t.Context(),
+		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)`,
+		"user-1", ProvisionedSub, "Ada Lovelace", "ada-lovelace@example.com",
+	)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	user := parsed.User.Username()
-	password, _ := parsed.User.Password()
+	store := db.New(pool)
 
-	if user == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a user")
+	user, err := store.GetUserBySub(t.Context(), ProvisionedSub)
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	host := parsed.Hostname()
-	if host == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a host")
-	}
-
-	// pgtestdb formats host and port with fmt.Sprintf, so an IPv6 host loses the brackets that
-	// make it parseable. YAGNI; ipv6 for dbtest is not supported.
-
-	if strings.Contains(host, ":") {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must not use an IPv6 host")
-	}
-
-	database := strings.TrimPrefix(parsed.Path, "/")
-	if database == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a database")
-	}
-
-	// pgtestdb reassembles these into its own URL without escaping them, so credentials that need
-	// escaping are rejected instead of being silently mangled.
-
-	if strings.ContainsAny(user+password, ":@/?#%") {
-		return pgtestdb.Config{}, errors.New(
-			"CLIENTS_DB_TEST_DSN credentials must not contain : @ / ? # or %",
-		)
-	}
-
-	port := parsed.Port()
-	if port == "" {
-		port = "5432"
-	}
-
-	return pgtestdb.Config{
-		DriverName: "pgx",
-		Host:       host,
-		Port:       port,
-		User:       user,
-		Password:   password,
-		Database:   database,
-		Options:    parsed.RawQuery,
-	}, nil
+	return store, user
 }
 
 // NewUnavailable returns a client whose every call fails, standing in for an unreachable database.
@@ -204,23 +97,52 @@ func NewUnavailable(t testing.TB) *db.Store {
 	return db.New(pool)
 }
 
-// insertUser inserts the user every test token's "sub-1" resolves to and returns it as stored.
-func (c *Client) insertUser(t testing.TB) generated.User {
+func newPool(t testing.TB) *pgxpool.Pool {
 	t.Helper()
 
-	var user generated.User
-
-	err := c.pool.QueryRow(
-		t.Context(),
-		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)
-		RETURNING id, sub, name, email, avatar_url, created_at, updated_at`,
-		"user-1", "sub-1", "Ada Lovelace", "ada-lovelace@example.com",
-	).Scan(
-		&user.ID, &user.Sub, &user.Name, &user.Email, &user.AvatarUrl, &user.CreatedAt, &user.UpdatedAt,
-	)
+	config, err := loadServerConfig()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	return user
+	instance := pgtestdb.Custom(t, config, migrator)
+
+	pool, err := pgxpool.New(t.Context(), instance.URL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Cleanup runs functions in reverse order of registration, which means the pool closes before
+	// pgtestdb cleans up (and therefore drops) the database. Postgres will not allow dropping a
+	// database that still has test peeps connected to it.
+
+	t.Cleanup(pool.Close)
+
+	return pool
+}
+
+// serverConfig parses a DSN into pgtestdb's config.
+//
+// The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
+// only true for environments where the tests have to run; production environments should have
+// the DB user scoped to a specific database.
+//
+// pgtestdb reassembles the URL without escaping, so credentials that need escaping won't connect.
+func serverConfig(dsn string) (pgtestdb.Config, error) {
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return pgtestdb.Config{}, fmt.Errorf("parse CLIENTS_DB_TEST_DSN: %w", err)
+	}
+
+	password, _ := parsed.User.Password()
+
+	return pgtestdb.Config{
+		DriverName: "pgx",
+		Host:       parsed.Hostname(),
+		Port:       cmp.Or(parsed.Port(), "5432"),
+		User:       parsed.User.Username(),
+		Password:   password,
+		Database:   strings.TrimPrefix(parsed.Path, "/"),
+		Options:    parsed.RawQuery,
+	}, nil
 }
