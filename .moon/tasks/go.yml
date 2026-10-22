@@ -12,6 +12,8 @@ fileGroups:
         - "**/*.go"
     tests:
         - "**/*_test.go"
+    migrations:
+        - "sql/migrations/*.sql"
     generated:
         - "**/*.sql.go"
         - "**/*.gen.go"
@@ -73,12 +75,11 @@ tasks:
 
     test:
         command: "go test ./..."
-        deps:
-            - "migrate-test"
         inputs:
             - "@group(configs)"
             - "@group(sources)"
             - "@group(tests)"
+            - "@group(migrations)"
 
     migrate:
         command: "goose -dir sql/migrations up"
@@ -87,12 +88,6 @@ tasks:
     migrate-down:
         command: "goose -dir sql/migrations down"
         preset: "utility"
-
-    migrate-test:
-        command: 'goose -dir sql/migrations postgres "$CLIENTS_DB_TEST_DSN" up'
-        options:
-            cache: false
-            envFile: true
 
     migration-create:
         command: "goose"

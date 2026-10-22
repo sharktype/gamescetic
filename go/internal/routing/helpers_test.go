@@ -15,39 +15,25 @@ import (
 	"go.uber.org/zap"
 )
 
-// "provisioned" means stubbed rather than using the real test database.
-
-func provisionedUsers() db.Client {
-	return &dbtest.Stub{User: dbtest.ProvisionedUser()}
-}
-
-func provisionedClients(t *testing.T) (*clients.Clients, *authtest.Client) {
-	t.Helper()
-
-	users := provisionedUsers()
-	authClient := authtest.New(t, users)
-
-	return &clients.Clients{DB: users, Auth: authClient.Client}, authClient
-}
-
 type testAPI struct {
 	router  chi.Router
 	public  *huma.Group
 	secured *huma.Group
-	client  *authtest.Client
+	signer  *authtest.Signer
 }
 
+// newTestAPI backs auth with a closed database: a request reaching the user lookup fails with 500.
 func newTestAPI(t *testing.T) testAPI {
 	t.Helper()
 
-	appClients, authClient := provisionedClients(t)
+	authClient := authtest.New(t, dbtest.NewClosed(t))
 
 	router := chi.NewMux()
 	public, secured := newAPI(
-		router, huma.DefaultConfig("test", "0.0.0"), appClients.Auth,
+		router, huma.DefaultConfig("test", "0.0.0"), authClient.Client,
 	)
 
-	return testAPI{router: router, public: public, secured: secured, client: authClient}
+	return testAPI{router: router, public: public, secured: secured, signer: authClient.Signer}
 }
 
 func testRouter(t *testing.T) *chi.Mux {
@@ -69,20 +55,20 @@ func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 	return NewRouter(logger, corsHandler)
 }
 
-func newHandledRouter(t *testing.T) (http.Handler, *authtest.Client) {
+func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest.Signer) {
 	t.Helper()
 
 	router := testRouter(t)
-	appClients, authClient := provisionedClients(t)
+	authClient := authtest.New(t, database)
 
 	Handle(
 		zap.NewNop(),
 		router,
-		appClients,
+		&clients.Clients{DB: database, Auth: authClient.Client},
 		huma.DefaultConfig("test", "1"),
 	)
 
-	return router, authClient
+	return router, authClient.Signer
 }
 
 func get(router http.Handler, path, authorization string) *httptest.ResponseRecorder {

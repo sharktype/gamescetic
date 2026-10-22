@@ -1,7 +1,6 @@
 package health
 
 import (
-	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,9 +12,7 @@ import (
 
 func TestGetDatabaseHealth(t *testing.T) {
 	t.Run("a reachable database reports OK", func(t *testing.T) {
-		output, err := GetDatabaseHealth(&dbtest.Stub{})(
-			context.Background(), &GetHealthInput{},
-		)
+		output, err := GetDatabaseHealth(dbtest.New(t))(t.Context(), &GetHealthInput{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -26,11 +23,7 @@ func TestGetDatabaseHealth(t *testing.T) {
 	})
 
 	t.Run("a failing check returns a fixed 503 that keeps the cause", func(t *testing.T) {
-		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
-
-		_, err := GetDatabaseHealth(
-			&dbtest.Stub{PingErr: cause},
-		)(context.Background(), &GetHealthInput{})
+		_, err := GetDatabaseHealth(dbtest.NewClosed(t))(t.Context(), &GetHealthInput{})
 		if err == nil {
 			t.Fatal("expected an error")
 		}
@@ -44,12 +37,13 @@ func TestGetDatabaseHealth(t *testing.T) {
 			t.Fatalf("got status %d, want %d", statusErr.GetStatus(), http.StatusServiceUnavailable)
 		}
 
-		if strings.Contains(statusErr.Error(), "connection refused") {
-			t.Fatalf("the response error leaks the cause: %q", statusErr.Error())
+		cause := errors.Unwrap(err)
+		if cause == nil {
+			t.Fatal("the error lost its cause")
 		}
 
-		if !errors.Is(errors.Unwrap(err), cause) {
-			t.Fatalf("got wrapped cause %v, want %v", errors.Unwrap(err), cause)
+		if strings.Contains(statusErr.Error(), cause.Error()) {
+			t.Fatalf("the response error leaks the cause: %q", statusErr.Error())
 		}
 	})
 }

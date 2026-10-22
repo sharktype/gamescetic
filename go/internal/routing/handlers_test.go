@@ -21,7 +21,7 @@ import (
 
 func TestHandle(t *testing.T) {
 	t.Run("the specification documents every operation", func(t *testing.T) {
-		router, _ := newHandledRouter(t)
+		router, _ := newHandledRouter(t, dbtest.NewClosed(t))
 		response := get(router, "/openapi.json", "")
 
 		if response.Code != http.StatusOK {
@@ -44,9 +44,11 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("auth health answers with the user", func(t *testing.T) {
-		router, authClient := newHandledRouter(t)
+		user := dbtest.ProvisionedUser()
 
-		response := get(router, "/health/auth", "Bearer "+authClient.Token(t, "sub-1"))
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
+
+		response := get(router, "/health/auth", "Bearer "+signer.Token(t, user.Sub))
 
 		if response.Code != http.StatusOK {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusOK)
@@ -60,12 +62,9 @@ func TestHandle(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if body.Message != "user-1 (Ada Lovelace, ada-lovelace@example.com) OK" {
-			t.Fatalf(
-				"got %q, want %q",
-				body.Message,
-				"user-1 (Ada Lovelace, ada-lovelace@example.com) OK",
-			)
+		expected := fmt.Sprintf("%s (%s, %s) OK", user.ID, user.Name, user.Email)
+		if body.Message != expected {
+			t.Fatalf("got %q, want %q", body.Message, expected)
 		}
 	})
 
@@ -136,9 +135,11 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		router, authClient := newHandledRouter(t)
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
-		code := get(router, "/health/error", "Bearer "+authClient.Token(t, "sub-1")).Code
+		code := get(
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
+		).Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
 		}
@@ -152,7 +153,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router, authClient := newHandledRouter(t)
+		router, signer := newHandledRouter(t, dbtest.Provision(t))
 
 		for i := range publicRateLimit {
 			if code := get(router, "/health", "").Code; code != http.StatusOK {
@@ -164,7 +165,9 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		code := get(router, "/health/error", "Bearer "+authClient.Token(t, "sub-1")).Code
+		code := get(
+			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
+		).Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
 		}
@@ -178,7 +181,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router, _ := newHandledRouter(t)
+		router, _ := newHandledRouter(t, dbtest.NewClosed(t))
 
 		for i := range securedRateLimit {
 			if code := get(
@@ -196,28 +199,34 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a failing dependency logs its cause", func(t *testing.T) {
-		cause := errors.New("dial tcp 10.0.0.1:5432: connect: connection refused")
-
 		core, logs := observer.New(zapcore.ErrorLevel)
 		logger := zap.New(core)
 
-		users := &dbtest.Stub{User: dbtest.ProvisionedUser(), PingErr: cause}
-		authClient := authtest.New(t, users)
+		unavailable := dbtest.NewClosed(t)
+
+		cause := unavailable.Ping(t.Context())
+		if cause == nil {
+			t.Fatal("expected the closed database to fail")
+		}
 
 		router := testRouterWithLogger(t, logger)
+		authClient := authtest.New(t, dbtest.Provision(t))
+
 		Handle(
 			logger,
 			router,
-			&clients.Clients{DB: users, Auth: authClient.Client},
+			&clients.Clients{DB: unavailable, Auth: authClient.Client},
 			huma.DefaultConfig("test", "1"),
 		)
 
-		response := get(router, "/health/db", "Bearer "+authClient.Token(t, "sub-1"))
+		response := get(
+			router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedUser().Sub),
+		)
 		if response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}
 
-		if strings.Contains(response.Body.String(), "connection refused") {
+		if strings.Contains(response.Body.String(), cause.Error()) {
 			t.Fatalf("the response leaks the cause: %q", response.Body.String())
 		}
 
@@ -227,7 +236,7 @@ func TestHandle(t *testing.T) {
 		}
 
 		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "connection refused",
+			logged, cause.Error(),
 		) {
 			t.Fatalf("the log entry lost the cause: %q", logged)
 		}

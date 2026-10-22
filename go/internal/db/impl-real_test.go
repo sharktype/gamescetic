@@ -10,10 +10,8 @@ import (
 )
 
 func TestExecTx(t *testing.T) {
-	database := dbtest.New(t)
-
 	t.Run("commits on success", func(t *testing.T) {
-		database.CleanupAfter(t)
+		database := dbtest.New(t)
 
 		err := database.ExecTx(t.Context(), func(tx generated.Querier) error {
 			return tx.SetMeta(t.Context(), generated.SetMetaParams{
@@ -36,7 +34,7 @@ func TestExecTx(t *testing.T) {
 	})
 
 	t.Run("rolls back when the callback fails", func(t *testing.T) {
-		database.CleanupAfter(t)
+		database := dbtest.New(t)
 
 		expectedErr := errors.New("arbitrary error")
 

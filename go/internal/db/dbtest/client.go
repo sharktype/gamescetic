@@ -1,134 +1,154 @@
 package dbtest
 
 import (
-	"context"
+	"cmp"
 	"errors"
+	"fmt"
+	"net/url"
 	"os"
-	"path/filepath"
-	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/joho/godotenv"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/peterldowns/pgtestdb"
+	"github.com/peterldowns/pgtestdb/migrators/goosemigrator"
+	"github.com/sharktype/satchel/generated"
+	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/satchel/sql"
 )
 
-type Client struct {
-	*db.Store
+var migrator = goosemigrator.New("migrations", goosemigrator.WithFS(sql.Migrations))
 
-	pool *pgxpool.Pool
-}
+var loadServerConfig = sync.OnceValues(func() (pgtestdb.Config, error) {
+	production, err := config.IsProduction()
+	if err != nil {
+		return pgtestdb.Config{}, err
+	}
 
-func New(t testing.TB) *Client {
-	t.Helper()
+	if production {
+		return pgtestdb.Config{}, errors.New(
+			"refusing to create test databases while PRODUCTION is set",
+		)
+	}
 
-	loadDotEnv(t)
+	if err := config.LoadEnv(); err != nil {
+		return pgtestdb.Config{}, fmt.Errorf("load .env: %w", err)
+	}
+
+	// A test suite passing without database-enabled tests passing proves exactly nothing.
 
 	dsn := os.Getenv("CLIENTS_DB_TEST_DSN")
 	if dsn == "" {
-		t.Fatal("CLIENTS_DB_TEST_DSN is not set")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
 	}
 
-	pool, err := pgxpool.New(t.Context(), dsn)
+	return serverConfig(dsn)
+})
+
+// New returns a client for a fresh, migrated database.
+//
+// The database is dropped if the test passes and kept for inspection if it fails (logs for trace).
+func New(t testing.TB) *db.Store {
+	t.Helper()
+
+	return db.New(newPool(t))
+}
+
+// Provision returns a client for a new database containing the user from ProvisionedUser.
+func Provision(t testing.TB) *db.Store {
+	t.Helper()
+
+	pool := newPool(t)
+	user := ProvisionedUser()
+
+	_, err := pool.Exec(
+		t.Context(),
+		`INSERT INTO "user" (id, sub, name, email) VALUES ($1, $2, $3, $4)`,
+		user.ID,
+		user.Sub,
+		user.Name,
+		user.Email,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	return db.New(pool)
+}
+
+// ProvisionedUser returns the user Provision inserts. Only ID, Sub, Name, and Email are set.
+func ProvisionedUser() generated.User {
+	return generated.User{
+		ID:    "user-1",
+		Sub:   "sub-1",
+		Name:  "Ada Lovelace",
+		Email: "ada-lovelace@example.com",
+	}
+}
+
+// NewClosed returns a client whose pool is already closed, so every call fails.
+func NewClosed(t testing.TB) *db.Store {
+	t.Helper()
+
+	pool, err := pgxpool.New(t.Context(), "postgres://closed")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pool.Close()
+
+	return db.New(pool)
+}
+
+func newPool(t testing.TB) *pgxpool.Pool {
+	t.Helper()
+
+	config, err := loadServerConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	instance := pgtestdb.Custom(t, config, migrator)
+
+	pool, err := pgxpool.New(t.Context(), instance.URL())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Cleanup runs functions in reverse order of registration, which means the pool closes before
+	// pgtestdb cleans up (and therefore drops) the database. Postgres will not allow dropping a
+	// database that still has test peeps connected to it.
 
 	t.Cleanup(pool.Close)
 
-	err = pool.Ping(t.Context())
-	if hasCode(err, "3D000") {
-		t.Fatal("the testing database does not exist")
-	}
-
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	migrated := false
-
-	err = pool.QueryRow(
-		t.Context(), "SELECT to_regclass('goose_db_version') IS NOT NULL",
-	).Scan(&migrated)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	if !migrated {
-		t.Fatal("the testing database has no migrations applied")
-	}
-
-	return &Client{
-		Store: db.New(pool),
-		pool:  pool,
-	}
+	return pool
 }
 
-func loadDotEnv(t testing.TB) {
-	t.Helper()
-
-	_, file, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("failed to locate .env")
-	}
-
-	err := godotenv.Load(filepath.Join(filepath.Dir(file), "..", "..", "..", ".env"))
-	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("load .env: %v", err)
-	}
-}
-
-func (c *Client) CleanupAfter(tb testing.TB) {
-	tb.Helper()
-	tb.Cleanup(func() {
-		if err := c.Cleanup(context.Background()); err != nil {
-			tb.Errorf("cleanup testing database: %v", err)
-		}
-	})
-}
-
-// Cleanup truncates every table in the public schema, leaving goose's bookkeeping alone.
-func (c *Client) Cleanup(ctx context.Context) error {
-	rows, err := c.pool.Query(ctx, `
-		SELECT tablename
-		FROM pg_tables
-		WHERE schemaname = 'public' AND tablename <> 'goose_db_version'
-		ORDER BY tablename
-	`)
+// serverConfig parses a DSN into pgtestdb's config.
+//
+// The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
+// only true for environments where the tests have to run; production environments should have
+// the DB user scoped to a specific database.
+//
+// pgtestdb reassembles the URL without escaping, so credentials that need escaping won't connect.
+func serverConfig(dsn string) (pgtestdb.Config, error) {
+	parsed, err := url.Parse(dsn)
 	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	var tables []string
-
-	for rows.Next() {
-		var table string
-		if err := rows.Scan(&table); err != nil {
-			return err
-		}
-
-		tables = append(tables, table)
+		return pgtestdb.Config{}, fmt.Errorf("parse CLIENTS_DB_TEST_DSN: %w", err)
 	}
 
-	if err := rows.Err(); err != nil {
-		return err
-	}
+	password, _ := parsed.User.Password()
 
-	if len(tables) == 0 {
-		return nil
-	}
-
-	identifiers := make([]string, len(tables))
-	for i, table := range tables {
-		identifiers[i] = pgx.Identifier{table}.Sanitize()
-	}
-
-	_, err = c.pool.Exec(
-		ctx, "TRUNCATE TABLE "+strings.Join(identifiers, ", ")+" RESTART IDENTITY CASCADE",
-	)
-
-	return err
+	return pgtestdb.Config{
+		DriverName: "pgx",
+		Host:       parsed.Hostname(),
+		Port:       cmp.Or(parsed.Port(), "5432"),
+		User:       parsed.User.Username(),
+		Password:   password,
+		Database:   strings.TrimPrefix(parsed.Path, "/"),
+		Options:    parsed.RawQuery,
+	}, nil
 }

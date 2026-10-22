@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
+	"github.com/sharktype/satchel/internal/db/dbtest"
 )
 
 func TestNewAPI(t *testing.T) {
@@ -53,8 +54,8 @@ func TestNewAPI(t *testing.T) {
 			"ApiKey": {Type: "apiKey", In: "header", Name: "X-API-Key"},
 		}
 
-		appClients, _ := provisionedClients(t)
-		_, secured := newAPI(chi.NewMux(), config, appClients.Auth)
+		authClient := authtest.New(t, dbtest.NewClosed(t))
+		_, secured := newAPI(chi.NewMux(), config, authClient.Client)
 
 		schemes := secured.OpenAPI().Components.SecuritySchemes
 		if _, ok := schemes["ApiKey"]; !ok {
@@ -83,7 +84,9 @@ func TestNewAPI(t *testing.T) {
 		api := newTestAPI(t)
 		handler := authtest.RegisterProbe(api.secured, authtest.RequireJWT("posts:read"))
 
-		code := get(api.router, authtest.ProbePath, "Bearer "+api.client.Token(t, "sub-1")).Code
+		token := api.signer.Token(t, dbtest.ProvisionedUser().Sub)
+
+		code := get(api.router, authtest.ProbePath, "Bearer "+token).Code
 		if code != http.StatusForbidden {
 			t.Fatalf("got %d, want %d", code, http.StatusForbidden)
 		}

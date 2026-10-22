@@ -26,8 +26,7 @@ type Clients struct {
 }
 
 type DB struct {
-	DSN     string `env:"DSN,required,notEmpty"`
-	TestDSN string `env:"TEST_DSN"`
+	DSN string `env:"DSN,required,notEmpty"`
 }
 
 type CORS struct {

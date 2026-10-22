@@ -14,8 +14,10 @@ linters:
                         - "!$test"
                         - "!**/main.go"
                         - "!**/internal/config/**"
+                        # Deliberate: dbtest is test support, not app code.
+                        - "!**/internal/db/dbtest/**"
                     deny:
                         - pkg: "github.com/sharktype/satchel/internal/config"
                           desc: >-
-                              config is a leaf imported only by main; declare the settings your package needs in
-                              its own package and let main map between them
+                              config is a leaf imported only by main; declare the settings your
+                              package needs in its own package and let main map between them

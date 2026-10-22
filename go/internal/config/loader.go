@@ -12,13 +12,13 @@ import (
 )
 
 func New() (*Config, error) {
-	production, err := isProduction()
+	production, err := IsProduction()
 	if err != nil {
 		return nil, err
 	}
 
 	if !production {
-		if err := loadDotEnv(); err != nil {
+		if err := LoadEnv(); err != nil {
 			return nil, fmt.Errorf("failed to load .env file: %w", err)
 		}
 	}
@@ -33,7 +33,7 @@ func New() (*Config, error) {
 	return cfg, nil
 }
 
-func isProduction() (bool, error) {
+func IsProduction() (bool, error) {
 	production, isSet := os.LookupEnv("PRODUCTION")
 	if !isSet {
 		return false, nil
@@ -46,7 +46,7 @@ func isProduction() (bool, error) {
 	return true, nil
 }
 
-func loadDotEnv() error {
+func LoadEnv() error {
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		return errors.New("failed to locate .env")

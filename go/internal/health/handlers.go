@@ -48,7 +48,7 @@ func GetAuthHealth(ctx context.Context, _ *GetHealthInput) (*GetAuthHealthOutput
 }
 
 func GetDatabaseHealth(
-	database db.Client,
+	database *db.Store,
 ) func(context.Context, *GetHealthInput) (*GetHealthOutput, error) {
 	return func(ctx context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
 		resp := &GetHealthOutput{}

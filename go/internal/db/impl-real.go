@@ -14,8 +14,6 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-var _ Client = (*Store)(nil)
-
 func New(pool *pgxpool.Pool) *Store {
 	return &Store{
 		Queries: generated.New(pool),
