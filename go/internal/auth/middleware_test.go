@@ -39,7 +39,6 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 	rejections := []struct {
 		name           string
-		unavailable    bool
 		token          func(t *testing.T, authClient *authtest.Client) string
 		expectedStatus int
 	}{
@@ -64,26 +63,13 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			},
 			expectedStatus: http.StatusForbidden,
 		},
-		{
-			name:        "a failing user lookup is an internal error",
-			unavailable: true,
-			token: func(t *testing.T, client *authtest.Client) string {
-				return client.Token(t, "sub-1")
-			},
-			expectedStatus: http.StatusInternalServerError,
-		},
 	}
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			var users db.Client
-			if test.unavailable {
-				users = dbtest.NewUnavailable(t)
-			} else {
-				users, _ = dbtest.Provision(t)
-			}
+			database, _ := dbtest.Provision(t)
 
-			api, authClient := newTestAPI(t, users)
+			api, authClient := newTestAPI(t, database)
 			probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			code := api.Get(
@@ -98,6 +84,22 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("a failing user lookup is an internal error", func(t *testing.T) {
+		api, authClient := newTestAPI(t, dbtest.NewUnavailable(t))
+		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
+
+		code := api.Get(
+			authtest.ProbePath, "Authorization: Bearer "+authClient.Token(t, "sub-1"),
+		).Code
+		if code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
+		}
+
+		if probe.Ran {
+			t.Fatal("the handler ran")
+		}
+	})
 
 	t.Run("scopes", func(t *testing.T) {
 		// "posts" is just an example here.

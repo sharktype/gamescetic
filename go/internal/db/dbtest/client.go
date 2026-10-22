@@ -115,6 +115,8 @@ func testConfig(testDSN, appDSN string, production bool) (pgtestdb.Config, error
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
 	}
 
+	// Overkill to compare schemes etc
+
 	if testDSN == appDSN {
 		return pgtestdb.Config{}, errors.New(
 			"CLIENTS_DB_TEST_DSN must differ from CLIENTS_DB_DSN",
@@ -146,8 +148,16 @@ func serverConfig(dsn string) (pgtestdb.Config, error) {
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a user")
 	}
 
-	if parsed.Hostname() == "" {
+	host := parsed.Hostname()
+	if host == "" {
 		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a host")
+	}
+
+	// pgtestdb formats host and port with fmt.Sprintf, so an IPv6 host loses the brackets that
+	// make it parseable. YAGNI; ipv6 for dbtest is not supported.
+
+	if strings.Contains(host, ":") {
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must not use an IPv6 host")
 	}
 
 	database := strings.TrimPrefix(parsed.Path, "/")
@@ -171,7 +181,7 @@ func serverConfig(dsn string) (pgtestdb.Config, error) {
 
 	return pgtestdb.Config{
 		DriverName: "pgx",
-		Host:       parsed.Hostname(),
+		Host:       host,
 		Port:       port,
 		User:       user,
 		Password:   password,

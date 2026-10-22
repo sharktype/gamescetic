@@ -108,6 +108,11 @@ func TestServerConfig(t *testing.T) {
 		{name: "unparseable URL", dsn: "postgres://%zz", expectedErr: true},
 		{name: "no user", dsn: "postgres://localhost/satchel", expectedErr: true},
 		{name: "no host", dsn: "postgres://ada@/satchel", expectedErr: true},
+		{
+			name:        "IPv6 host",
+			dsn:         "postgres://ada:secret@[::1]:5432/satchel",
+			expectedErr: true,
+		},
 		{name: "no database", dsn: "postgres://ada@localhost", expectedErr: true},
 		{name: "escaped @ in password", dsn: "postgres://ada:p%40ss@localhost/satchel", expectedErr: true},
 		{
