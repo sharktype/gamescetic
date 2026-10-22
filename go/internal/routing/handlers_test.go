@@ -10,8 +10,6 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth/authtest"
-	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 	"github.com/sharktype/satchel/internal/httpx"
 	"go.uber.org/zap"
@@ -202,9 +200,6 @@ func TestHandle(t *testing.T) {
 		core, logs := observer.New(zapcore.ErrorLevel)
 		logger := zap.New(core)
 
-		// Auth resolves the user through the live database; the handler pings the closed one.
-
-		authClient := authtest.New(t, dbtest.Provision(t))
 		unavailable := dbtest.NewClosed(t)
 
 		cause := unavailable.Ping(t.Context())
@@ -212,16 +207,12 @@ func TestHandle(t *testing.T) {
 			t.Fatal("expected the closed database to fail")
 		}
 
-		router := testRouterWithLogger(t, logger)
-		Handle(
-			logger,
-			router,
-			&clients.Clients{DB: unavailable, Auth: authClient.Client},
-			huma.DefaultConfig("test", "1"),
+		router, signer := newHandledRouterWithLogger(
+			t, logger, dbtest.Provision(t), unavailable,
 		)
 
 		response := get(
-			router, "/health/db", "Bearer "+authClient.Token(t, dbtest.ProvisionedUser.Sub),
+			router, "/health/db", "Bearer "+signer.Token(t, dbtest.ProvisionedUser.Sub),
 		)
 		if response.Code != http.StatusServiceUnavailable {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)

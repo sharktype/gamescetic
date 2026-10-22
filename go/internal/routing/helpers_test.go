@@ -58,11 +58,20 @@ func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 func newHandledRouter(t *testing.T, database db.Client) (http.Handler, *authtest.Signer) {
 	t.Helper()
 
-	router := testRouter(t)
-	authClient := authtest.New(t, database)
+	return newHandledRouterWithLogger(t, zap.NewNop(), database, database)
+}
+
+// newHandledRouterWithLogger resolves users through users and hands database to the handlers.
+func newHandledRouterWithLogger(
+	t *testing.T, logger *zap.Logger, users, database db.Client,
+) (http.Handler, *authtest.Signer) {
+	t.Helper()
+
+	router := testRouterWithLogger(t, logger)
+	authClient := authtest.New(t, users)
 
 	Handle(
-		zap.NewNop(),
+		logger,
 		router,
 		&clients.Clients{DB: database, Auth: authClient.Client},
 		huma.DefaultConfig("test", "1"),

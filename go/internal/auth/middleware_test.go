@@ -12,10 +12,12 @@ import (
 )
 
 func TestNewJWTAuthMiddleware(t *testing.T) {
+	users := dbtest.Provision(t)
+
 	t.Run("a verified token resolves the user by its subject", func(t *testing.T) {
 		row := dbtest.ProvisionedUser
 
-		api, signer := newTestAPI(t, dbtest.Provision(t))
+		api, signer := newTestAPI(t, users)
 		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 		token := signer.Token(t, row.Sub)
@@ -37,49 +39,53 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		}
 	})
 
+	t.Run("a failing user lookup is an internal error", func(t *testing.T) {
+		api, signer := newTestAPI(t, dbtest.NewClosed(t))
+		probe := authtest.RegisterProbe(api, authtest.RequireJWT())
+
+		token := signer.Token(t, dbtest.ProvisionedUser.Sub)
+
+		code := api.Get(authtest.ProbePath, "Authorization: Bearer "+token).Code
+		if code != http.StatusInternalServerError {
+			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
+		}
+
+		if probe.Ran {
+			t.Fatal("the handler ran")
+		}
+	})
+
 	rejections := []struct {
 		name           string
-		database       func(testing.TB) *db.Store
 		token          func(t *testing.T, signer *authtest.Signer) string
 		expectedStatus int
 	}{
 		{
-			name:     "a token signed by another key is rejected",
-			database: dbtest.NewClosed,
+			name: "a token signed by another key is rejected",
 			token: func(t *testing.T, _ *authtest.Signer) string {
 				return authtest.NewSigner(t).Token(t, dbtest.ProvisionedUser.Sub)
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
-			name:     "a token without a subject is rejected",
-			database: dbtest.NewClosed,
+			name: "a token without a subject is rejected",
 			token: func(t *testing.T, signer *authtest.Signer) string {
 				return signer.Token(t, "")
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
-			name:     "a subject that is not the provisioned user is forbidden",
-			database: dbtest.Provision,
+			name: "a subject that is not the provisioned user is forbidden",
 			token: func(t *testing.T, signer *authtest.Signer) string {
 				return signer.Token(t, "sub-2")
 			},
 			expectedStatus: http.StatusForbidden,
 		},
-		{
-			name:     "a failing user lookup is an internal error",
-			database: dbtest.NewClosed,
-			token: func(t *testing.T, signer *authtest.Signer) string {
-				return signer.Token(t, dbtest.ProvisionedUser.Sub)
-			},
-			expectedStatus: http.StatusInternalServerError,
-		},
 	}
 
 	for _, test := range rejections {
 		t.Run(test.name, func(t *testing.T) {
-			api, signer := newTestAPI(t, test.database(t))
+			api, signer := newTestAPI(t, users)
 			probe := authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			code := api.Get(
@@ -100,7 +106,6 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		tests := []struct {
 			name           string
-			database       func(testing.TB) *db.Store
 			declared       []string
 			granted        []string
 			expectedStatus int
@@ -108,13 +113,11 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		}{
 			{
 				name:           "no scopes declared",
-				database:       dbtest.Provision,
 				expectedStatus: http.StatusOK,
 				expectedIsRun:  true,
 			},
 			{
 				name:           "all declared scopes granted",
-				database:       dbtest.Provision,
 				declared:       []string{"posts:read", "posts:write"},
 				granted:        []string{"posts:read", "posts:write"},
 				expectedStatus: http.StatusOK,
@@ -122,7 +125,6 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			},
 			{
 				name:           "extra scopes are fine",
-				database:       dbtest.Provision,
 				declared:       []string{"posts:read"},
 				granted:        []string{"posts:read", "admin"},
 				expectedStatus: http.StatusOK,
@@ -130,14 +132,12 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			},
 			{
 				name:           "one of two declared scopes is not enough",
-				database:       dbtest.NewClosed,
 				declared:       []string{"posts:read", "posts:write"},
 				granted:        []string{"posts:read"},
 				expectedStatus: http.StatusForbidden,
 			},
 			{
 				name:           "no scopes claim",
-				database:       dbtest.NewClosed,
 				declared:       []string{"posts:read"},
 				expectedStatus: http.StatusForbidden,
 			},
@@ -145,7 +145,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
-				api, signer := newTestAPI(t, test.database(t))
+				api, signer := newTestAPI(t, users)
 				probe := authtest.RegisterProbe(api, authtest.RequireJWT(test.declared...))
 
 				token := signer.TokenWithScopes(t, dbtest.ProvisionedUser.Sub, test.granted)
@@ -164,56 +164,49 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 }
 
 func TestBearerToken(t *testing.T) {
+	users := dbtest.Provision(t)
+
 	tests := []struct {
 		name           string
-		database       func(testing.TB) *db.Store
 		authorization  func(token string) string
 		expectedStatus int
 	}{
 		{
 			name:           "bearer scheme",
-			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "Bearer " + token },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "scheme is case insensitive",
-			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "bearer " + token },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "surrounding whitespace is trimmed",
-			database:       dbtest.Provision,
 			authorization:  func(token string) string { return "Bearer   " + token + " " },
 			expectedStatus: http.StatusOK,
 		},
 		{
 			name:           "missing scheme",
-			database:       dbtest.NewClosed,
 			authorization:  func(token string) string { return token },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "other scheme",
-			database:       dbtest.NewClosed,
 			authorization:  func(token string) string { return "Basic " + token },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "empty header",
-			database:       dbtest.NewClosed,
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "scheme without a token",
-			database:       dbtest.NewClosed,
 			authorization:  func(string) string { return "Bearer " },
 			expectedStatus: http.StatusUnauthorized,
 		},
 		{
 			name:           "embedded whitespace",
-			database:       dbtest.NewClosed,
 			authorization:  func(string) string { return "Bearer foo bar" },
 			expectedStatus: http.StatusUnauthorized,
 		},
@@ -221,7 +214,7 @@ func TestBearerToken(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			api, signer := newTestAPI(t, test.database(t))
+			api, signer := newTestAPI(t, users)
 			authtest.RegisterProbe(api, authtest.RequireJWT())
 
 			if test.authorization == nil {

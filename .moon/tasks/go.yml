@@ -12,6 +12,8 @@ fileGroups:
         - "**/*.go"
     tests:
         - "**/*_test.go"
+    migrations:
+        - "sql/migrations/*.sql"
     generated:
         - "**/*.sql.go"
         - "**/*.gen.go"
@@ -77,6 +79,7 @@ tasks:
             - "@group(configs)"
             - "@group(sources)"
             - "@group(tests)"
+            - "@group(migrations)"
 
     migrate:
         command: "goose -dir sql/migrations up"

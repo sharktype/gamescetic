@@ -14,6 +14,7 @@ linters:
                         - "!$test"
                         - "!**/main.go"
                         - "!**/internal/config/**"
+                        # Deliberate: dbtest is test support, not app code.
                         - "!**/internal/db/dbtest/**"
                     deny:
                         - pkg: "github.com/sharktype/satchel/internal/config"
