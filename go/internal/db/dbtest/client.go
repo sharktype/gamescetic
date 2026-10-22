@@ -47,7 +47,11 @@ var loadServer = sync.OnceValues(func() (server, error) {
 		return server{}, fmt.Errorf("load .env: %w", err)
 	}
 
-	config, err := serverConfig(os.Getenv("CLIENTS_DB_DSN"))
+	config, err := testConfig(
+		os.Getenv("CLIENTS_DB_TEST_DSN"),
+		os.Getenv("CLIENTS_DB_DSN"),
+		os.Getenv("PRODUCTION") != "",
+	)
 	if err != nil {
 		return server{}, err
 	}
@@ -99,38 +103,56 @@ func Provision(t testing.TB) (*Client, generated.User) {
 	return client, client.insertUser(t)
 }
 
+// testConfig refuses to guess which database tests may create databases on.
+func testConfig(testDSN, appDSN string, production bool) (pgtestdb.Config, error) {
+	if production {
+		return pgtestdb.Config{}, errors.New(
+			"refusing to create test databases while PRODUCTION is set",
+		)
+	}
+
+	if testDSN == "" {
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
+	}
+
+	if testDSN == appDSN {
+		return pgtestdb.Config{}, errors.New(
+			"CLIENTS_DB_TEST_DSN must differ from CLIENTS_DB_DSN",
+		)
+	}
+
+	return serverConfig(testDSN)
+}
+
 // serverConfig parses a DSN into pgtestdb's config.
 //
 // The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
 // only true for environments where the tests have to run; production environments should have
 // the DB user scoped to a specific database.
-//
-// Warning: this is not enforced by the service code, but then again, neither are good security
-// practices in general. So as always: use your best judgement.
 func serverConfig(dsn string) (pgtestdb.Config, error) {
 	if dsn == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN is not set")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN is not set")
 	}
 
 	parsed, err := url.Parse(dsn)
 	if err != nil || (parsed.Scheme != "postgres" && parsed.Scheme != "postgresql") {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must be a postgres:// URL")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must be a postgres:// URL")
 	}
 
 	user := parsed.User.Username()
 	password, _ := parsed.User.Password()
 
 	if user == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a user")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a user")
 	}
 
 	if parsed.Hostname() == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a host")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a host")
 	}
 
 	database := strings.TrimPrefix(parsed.Path, "/")
 	if database == "" {
-		return pgtestdb.Config{}, errors.New("CLIENTS_DB_DSN must name a database")
+		return pgtestdb.Config{}, errors.New("CLIENTS_DB_TEST_DSN must name a database")
 	}
 
 	// pgtestdb reassembles these into its own URL without escaping them, so credentials that need
@@ -138,7 +160,7 @@ func serverConfig(dsn string) (pgtestdb.Config, error) {
 
 	if strings.ContainsAny(user+password, ":@/?#%") {
 		return pgtestdb.Config{}, errors.New(
-			"CLIENTS_DB_DSN credentials must not contain : @ / ? # or %",
+			"CLIENTS_DB_TEST_DSN credentials must not contain : @ / ? # or %",
 		)
 	}
 
