@@ -21,7 +21,7 @@ fileGroups:
 
 tasks:
     install:
-        command: "go mod download"
+        command: "go mod download && go mod tidy"
         inputs:
             - "@group(configs)"
 
