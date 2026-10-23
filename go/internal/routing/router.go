@@ -16,15 +16,13 @@ import (
 )
 
 const (
-	// RequestTimeout bounds handler execution; some server timeouts derive from it.
-	RequestTimeout = 60 * time.Second
-
+	RequestTimeout   = 60 * time.Second
 	publicRateLimit  = 30
 	securedRateLimit = 60
 	compressionLevel = 5
 )
 
-// newAPI returns the groups on which every operation must be registered.
+// newAPI returns the groups on which every operation must be registered as a n-ary tuple.
 func newAPI(
 	r chi.Router, humaConfig huma.Config, authClient *auth.Client,
 ) (public *huma.Group, secured *huma.Group) {
@@ -55,7 +53,7 @@ func newAPI(
 
 // NewRouter returns the transport-level handler.
 //
-// Every request passes through this router, including ones huma/the API never sees, such as /ping.
+// Every request passes through this router including ones huma/the API never sees such as /ping.
 //
 // Middleware here apply to _all_ traffic, and middleware in the API groups are layered on top.
 func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
@@ -90,7 +88,7 @@ func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handle
 	return router
 }
 
-// declareJWT marks every operation on the secured group as requiring a JWT token.
+// declareJWT marks the given operation as requiring a JWT token.
 //
 // If the operation already declares a JWT requirement, e.g. to ask for scopes, it is left as is.
 // This also matters because Huma calls declareJWT twice per operation: once when adding it to

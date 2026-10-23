@@ -29,7 +29,7 @@ func (s *Store) Ping(ctx context.Context) error {
 	return s.pool.Ping(ctx)
 }
 
-// ExecTx runs fn in a transaction, committing only if fn returns nil.
+// ExecTx runs a fn in a transaction, committing only if fn has no error.
 func (s *Store) ExecTx(ctx context.Context, fn func(generated.Querier) error) error {
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -37,7 +37,7 @@ func (s *Store) ExecTx(ctx context.Context, fn func(generated.Querier) error) er
 	}
 
 	defer func() {
-		// Safe to ignore; actual failures kill the connection.
+		// Safe to ignore since actual failures kill the connection.
 
 		_ = tx.Rollback(context.WithoutCancel(ctx))
 	}()

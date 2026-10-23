@@ -9,9 +9,7 @@ type Config struct {
 	Port    int  `env:"PORT" envDefault:"9500"`
 	Verbose bool `env:"VERBOSE" envDefault:"false"`
 
-	// Production is resolved from the real environment before .env is loaded, so it is not
-	// env-tagged; see New.
-
+	// Production is a special flag variable always resolved directly from the real env.
 	Production bool `env:"-"`
 }
 

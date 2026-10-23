@@ -26,8 +26,8 @@ func NewCORSHandler(cfg CORSConfig) (func(nethttp.Handler) nethttp.Handler, erro
 }
 
 func SecurityHeaders() func(nethttp.Handler) nethttp.Handler {
-	// Note this API will only ever serve plain HTTP behind a proxy or CDN, so HSTS belongs at that
-	// hop, not here (e.g., Cloudflare's security settings).
+	// Note this API will only ever serve plain HTTP behind a proxy or CDN. HSTS settings belong at
+	// that layer, not here (e.g., Cloudflare's security settings).
 
 	return func(next nethttp.Handler) nethttp.Handler {
 		return nethttp.HandlerFunc(func(writer nethttp.ResponseWriter, request *nethttp.Request) {

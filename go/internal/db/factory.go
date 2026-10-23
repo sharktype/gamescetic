@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	// driver is the only supported database driver.
-	driver = "postgres"
-
+	driver         = "postgres"
 	startupTimeout = 10 * time.Second
 )
 

@@ -118,7 +118,7 @@ func newPool(t testing.TB) *pgxpool.Pool {
 		t.Fatal(err)
 	}
 
-	// Cleanup runs functions in reverse order of registration, which means the pool closes before
+	// Cleanup runs functions in reverse order of registration which means the pool closes before
 	// pgtestdb cleans up (and therefore drops) the database. Postgres will not allow dropping a
 	// database that still has test peeps connected to it.
 
@@ -129,11 +129,7 @@ func newPool(t testing.TB) *pgxpool.Pool {
 
 // serverConfig parses a DSN into pgtestdb's config.
 //
-// The DSN's DB only has to exist. Its user must be able to create roles and databases. This is
-// only true for environments where the tests have to run; production environments should have
-// the DB user scoped to a specific database.
-//
-// pgtestdb reassembles the URL without escaping, so credentials that need escaping won't connect.
+// The DSN's DB has to exist and its user must be able to create roles and DBs.
 func serverConfig(dsn string) (pgtestdb.Config, error) {
 	parsed, err := url.Parse(dsn)
 	if err != nil {

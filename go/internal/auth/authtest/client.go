@@ -19,13 +19,12 @@ import (
 	"go.uber.org/zap"
 )
 
-// Client is an auth.Client verifying tokens from a throwaway IDP, which it also signs them with.
+// Client verifies tokens from a throwaway IDP.
 type Client struct {
 	*auth.Client
 	*Signer
 }
 
-// Signer mints tokens for a throwaway IDP. Only the auth.Client built around it by New trusts it.
 type Signer struct {
 	key      jwk.Key
 	issuer   string

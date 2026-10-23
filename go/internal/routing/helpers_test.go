@@ -22,7 +22,9 @@ type testAPI struct {
 	signer  *authtest.Signer
 }
 
-// newTestAPI backs auth with a closed database: a request reaching the user lookup fails with 500.
+// newTestAPI creates a test API.
+//
+// The test API performs auth ops with a closed DB, meaning anything requiring DB access will fail.
 func newTestAPI(t *testing.T) testAPI {
 	t.Helper()
 

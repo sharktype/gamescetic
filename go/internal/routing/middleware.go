@@ -29,8 +29,8 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 		request, writer := humachi.Unwrap(ctx)
 
 		// KeyByIP falls back to the raw RemoteAddr when it cannot split a host and port. If that
-		// value is not an IP, using it as a key would give every connection its own bucket;
-		// share one bucket instead of silently disabling the limit.
+		// value is not an IP, using it as a key would give every connection its own "bucket." In
+		// that case, we must share a single bucket for all connections.
 
 		ip, err := httprate.KeyByIP(request)
 		if err != nil || net.ParseIP(ip) == nil {

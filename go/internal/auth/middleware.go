@@ -81,7 +81,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 // JWTRequirement returns the scopes of the operation's JWT security requirement.
 //
-// More than one JWT requirement is not supported.
+// Having more than one JWT requirement per operation is deliberately not supported.
 func JWTRequirement(operation *huma.Operation) (scopes []string, declared bool, err error) {
 	for _, requirement := range operation.Security {
 		requirementScopes, ok := requirement[JWTSchemeKey]

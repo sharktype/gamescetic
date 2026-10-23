@@ -6,7 +6,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// StatusError is a huma.StatusError that carries a cause without exposing it in the response.
 type StatusError struct {
 	huma.ErrorModel
 	cause error
