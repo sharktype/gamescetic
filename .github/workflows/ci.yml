@@ -23,7 +23,7 @@ permissions:
 #
 
 env:
-    RAILWAY_SERVICE: satchel
+    RAILWAY_SERVICE: satchel-go
 
 jobs:
     test-go:
