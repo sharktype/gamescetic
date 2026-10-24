@@ -79,11 +79,11 @@ func TestNewConfig(t *testing.T) {
 			t.Fatal("got verbose false, want true")
 		}
 
-		if cfg.Telemetry.SentryDSN != "https://public@example.com/1" {
+		if cfg.Telemetry.SentryDSN != "https://test@example.com/1" {
 			t.Fatalf(
 				"got sentry DSN %q, want %q",
 				cfg.Telemetry.SentryDSN,
-				"https://public@example.com/1",
+				"https://test@example.com/1",
 			)
 		}
 	})
