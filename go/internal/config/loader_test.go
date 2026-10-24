@@ -28,6 +28,7 @@ func TestNewConfig(t *testing.T) {
 		setRequiredEnv(t)
 		t.Setenv("VERBOSE", "true")
 		t.Setenv("PORT", "8080")
+		t.Setenv("TELEMETRY_SENTRY_DSN", "https://public@example.com/1")
 
 		cfg, err := New()
 		if err != nil {
@@ -76,6 +77,28 @@ func TestNewConfig(t *testing.T) {
 
 		if !cfg.Verbose {
 			t.Fatal("got verbose false, want true")
+		}
+
+		if cfg.Telemetry.SentryDSN != "https://public@example.com/1" {
+			t.Fatalf(
+				"got sentry DSN %q, want %q",
+				cfg.Telemetry.SentryDSN,
+				"https://public@example.com/1",
+			)
+		}
+	})
+
+	t.Run("the telemetry DSN is optional", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("TELEMETRY_SENTRY_DSN", "")
+
+		cfg, err := New()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg.Telemetry.SentryDSN != "" {
+			t.Fatalf("got sentry DSN %q, want none", cfg.Telemetry.SentryDSN)
 		}
 	})
 
@@ -151,7 +174,6 @@ func TestIsProduction(t *testing.T) {
 	for _, test := range invalidTests {
 		t.Run("rejects "+test.name, func(t *testing.T) {
 			t.Setenv("PRODUCTION", test.value)
-
 			if _, err := IsProduction(); err == nil {
 				t.Fatalf("expected an error for %q", test.value)
 			}

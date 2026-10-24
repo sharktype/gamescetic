@@ -50,6 +50,42 @@ func TestAppLog(t *testing.T) {
 	})
 }
 
+func TestInit(t *testing.T) {
+	t.Run("installs a debug logger when verbose", func(t *testing.T) {
+		previous := zap.L()
+		t.Cleanup(func() { zap.ReplaceGlobals(previous) })
+
+		shutdown, err := Init(Config{Verbose: true})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(shutdown)
+
+		if !zap.L().Core().Enabled(zapcore.DebugLevel) {
+			t.Fatal("debug logging is disabled")
+		}
+	})
+
+	t.Run("installs an info logger by default", func(t *testing.T) {
+		previous := zap.L()
+		t.Cleanup(func() { zap.ReplaceGlobals(previous) })
+
+		shutdown, err := Init(Config{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(shutdown)
+
+		if zap.L().Core().Enabled(zapcore.DebugLevel) {
+			t.Fatal("debug logging is enabled")
+		}
+
+		if !zap.L().Core().Enabled(zapcore.InfoLevel) {
+			t.Fatal("info logging is disabled")
+		}
+	})
+}
+
 func replaceGlobalLogger(t *testing.T) *observer.ObservedLogs {
 	t.Helper()
 

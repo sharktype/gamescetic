@@ -3,7 +3,6 @@ package routing
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -11,6 +10,7 @@ import (
 	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
+	"go.uber.org/zap"
 )
 
 func Handle(
@@ -77,10 +77,12 @@ func register[I, O any](
 			}
 		}
 
-		bugtracker.ReportError(fmt.Errorf(
-			"handler %s failed with status %d: %w",
-			operation.OperationID, status, reportErr,
-		))
+		bugtracker.ReportError(
+			"handler failed",
+			reportErr,
+			zap.String("operation", operation.OperationID),
+			zap.Int("status", status),
+		)
 
 		return result, err
 	})

@@ -62,7 +62,7 @@ func run() (err error) {
 
 	defer func() {
 		if err != nil {
-			bugtracker.ReportError(err)
+			bugtracker.ReportError("app run failed", err)
 		}
 	}()
 

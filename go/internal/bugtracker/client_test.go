@@ -7,6 +7,21 @@ import (
 )
 
 func TestInit(t *testing.T) {
+	t.Run("a valid DSN in production enables the bugtracker", func(t *testing.T) {
+		previous := sentry.CurrentHub().Client()
+		t.Cleanup(func() { sentry.CurrentHub().BindClient(previous) })
+
+		shutdown, err := Init("https://public@example.com/1", true)
+		if err != nil {
+			t.Fatalf("got error %v, want none", err)
+		}
+		t.Cleanup(shutdown)
+
+		if !sentry.CurrentHub().Client().IsEnabled() {
+			t.Fatal("the bugtracker was not initialized")
+		}
+	})
+
 	t.Run("an empty DSN disables the bugtracker", func(t *testing.T) {
 		shutdown, err := Init("", true)
 		if err != nil {

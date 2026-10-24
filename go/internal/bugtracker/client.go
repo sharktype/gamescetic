@@ -7,6 +7,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/sharktype/satchel/internal/logger"
+	"go.uber.org/zap"
 )
 
 const (
@@ -37,8 +38,8 @@ func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 	}, nil
 }
 
-func ReportError(err error) {
-	logger.Error(err.Error())
+func ReportError(msg string, err error, fields ...zap.Field) {
+	logger.Error(msg, append([]zap.Field{zap.Error(err)}, fields...)...)
 
 	sentry.CaptureException(err)
 }

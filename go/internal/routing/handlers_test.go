@@ -93,16 +93,22 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}
 
-		entries := logs.All()
+		entries := logs.FilterMessage("handler failed").All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d log entries, want 1", len(entries))
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		message := entries[0].Message
-		if !strings.Contains(message, "connection refused") ||
-			!strings.Contains(message, "GetWrappedError") ||
-			!strings.Contains(message, "503") {
-			t.Fatalf("the log entry lost context: %q", message)
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetWrappedError" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetWrappedError")
+		}
+
+		if fields["status"] != int64(http.StatusServiceUnavailable) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusServiceUnavailable)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, "connection refused") {
+			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
 
@@ -127,13 +133,22 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
 		}
 
-		entries := logs.All()
+		entries := logs.FilterMessage("handler failed").All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d log entries, want 1", len(entries))
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if message := entries[0].Message; !strings.Contains(message, "intentional failure") {
-			t.Fatalf("the log entry lost the error: %q", message)
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetPlainError" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetPlainError")
+		}
+
+		if fields["status"] != int64(http.StatusInternalServerError) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusInternalServerError)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, "intentional failure") {
+			t.Fatalf("the log entry lost the error: %q", logged)
 		}
 	})
 
@@ -232,13 +247,22 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("the response leaks the cause: %q", response.Body.String())
 		}
 
-		entries := logs.All()
+		entries := logs.FilterMessage("handler failed").All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d log entries, want 1", len(entries))
+			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if message := entries[0].Message; !strings.Contains(message, cause.Error()) {
-			t.Fatalf("the log entry lost the cause: %q", message)
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetDatabaseHealth" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetDatabaseHealth")
+		}
+
+		if fields["status"] != int64(http.StatusServiceUnavailable) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusServiceUnavailable)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, cause.Error()) {
+			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
 }
