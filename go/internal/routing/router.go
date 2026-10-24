@@ -59,18 +59,28 @@ func newAPI(
 func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
-	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
-	// directly reachable. Otherwise, RealIP would trust the given client-controlled IP address.
+	// We make the assumption that either the API sits behind exactly one proxy e.g. Cloudflare, or
+	// the service is deployed as a standalone server communicating over HTTP to another Docker
+	// container.
 	//
-	// This is fine for self-hosted configurations most of the time since either the API would be
-	// deployed via a reverse proxy with TLS, or the API is only used by trusted clients.
+	// The proxy is expected to append the client to X-Forwarded-For and is not directly reachable.
+	// Only the "rightmost" hop is trusted, so a client can't forge its address by prepending one.
+	// Being directly reachable would still let it set the header outright.
+	//
+	// For HTTP-accessible direct deployments, the proxy is not used and the client IP is taken from
+	// the request's remote address. This is considered safe only because you'd be overly
+	// audacious if you were directly exposing your service to the internet over raw HTTP.
+	//
+	// As always, a reminder: production deployments should put a "real" rate limiter at the edge
+	// layer and not rely on this basic middleware implementation, especially when there are
+	// multiple replicas behind a load balancer.
 
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	router.Use(middleware.ClientIPFromXFF())
+	router.Use(realIP)
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
-		Logger:  zap.NewStdLog(logger),
-		NoColor: true,
+		Logger: zap.NewStdLog(logger),
 	}))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)

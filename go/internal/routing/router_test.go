@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db/dbtest"
@@ -199,6 +200,24 @@ func TestNewRouter(t *testing.T) {
 		}
 	})
 
+	t.Run("the client address replaces the peer address", func(t *testing.T) {
+		router := testRouter(t)
+
+		var remoteAddr string
+		router.Get("/ip", func(_ http.ResponseWriter, r *http.Request) {
+			remoteAddr = r.RemoteAddr
+		})
+
+		request := httptest.NewRequest(http.MethodGet, "/ip", nil)
+		request.Header.Set("X-Forwarded-For", "1.0.0.1")
+
+		router.ServeHTTP(httptest.NewRecorder(), request)
+
+		if remoteAddr != "1.0.0.1" {
+			t.Fatalf("got %q, want %q", remoteAddr, "1.0.0.1")
+		}
+	})
+
 	t.Run("the global limiter covers ping", func(t *testing.T) {
 		router := testRouter(t)
 
@@ -240,6 +259,10 @@ func TestNewRouter(t *testing.T) {
 
 		if code := request("1.0.0.1"); code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
+		}
+
+		if code := request("9.9.9.9, 1.0.0.1"); code != http.StatusTooManyRequests {
+			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
 		if code := request("1.0.0.2"); code != http.StatusOK {
@@ -295,6 +318,38 @@ func TestRateLimit(t *testing.T) {
 
 		if code := get(api.router, "/things/a", "").Code; code == http.StatusTooManyRequests {
 			t.Fatal("exhausting one operation also exhausted another in the same group")
+		}
+	})
+
+	t.Run("the operation limiter is per client behind the proxy", func(t *testing.T) {
+		api := newTestAPI(t)
+
+		authtest.RegisterProbe(api.public, nil)
+
+		handler := middleware.ClientIPFromXFF()(api.router)
+
+		request := func(forwardedFor string) int {
+			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
+			request.Header.Set("X-Forwarded-For", forwardedFor)
+
+			response := httptest.NewRecorder()
+			handler.ServeHTTP(response, request)
+
+			return response.Code
+		}
+
+		for i := range publicRateLimit {
+			if code := request("1.0.0.1"); code != http.StatusOK {
+				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
+			}
+		}
+
+		if code := request("9.9.9.9, 1.0.0.1"); code != http.StatusTooManyRequests {
+			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
+		}
+
+		if code := request("1.0.0.2"); code != http.StatusOK {
+			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
 		}
 	})
 
