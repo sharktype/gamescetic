@@ -7,9 +7,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
+	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -76,10 +76,9 @@ func register[I, O any](
 			}
 		}
 
-		bugtracker.ReportError(
-			ctx,
+		logger.Error(
 			"handler failed",
-			reportErr,
+			zap.Error(reportErr),
 			zap.String("operation", operation.OperationID),
 			zap.Int("status", status),
 		)

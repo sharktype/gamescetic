@@ -11,7 +11,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
@@ -51,20 +50,6 @@ func run() (err error) {
 		return fmt.Errorf("error creating logger: %w", err)
 	}
 	defer shutdownLogger()
-
-	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN, cfg.Production)
-	if err != nil {
-		return fmt.Errorf("error creating bugtracker: %w", err)
-	}
-	defer shutdownBugtracker()
-
-	// We actually do want to capture startup errors in telemetry.
-
-	defer func() {
-		if err != nil {
-			bugtracker.ReportError(context.Background(), "app run failed", err)
-		}
-	}()
 
 	if cfg.Production {
 		logger.Info("app booting in production mode...")

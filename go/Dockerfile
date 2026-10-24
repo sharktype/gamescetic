@@ -19,10 +19,6 @@ FROM alpine:3 AS runner
 WORKDIR /app
 
 COPY --from=builder /app/main .
-
-# For Sentry source mapping:
-
-COPY --from=builder /app/main.go .
 COPY --from=builder /app/internal ./internal
 COPY --from=builder /app/generated ./generated
 

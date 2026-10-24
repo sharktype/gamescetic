@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -8,7 +9,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
-	"github.com/sharktype/satchel/internal/bugtracker"
+	"github.com/sharktype/satchel/internal/logger"
 )
 
 const (
@@ -28,11 +29,9 @@ func recoverer(next http.Handler) http.Handler {
 				panic(recovered)
 			}
 
-			bugtracker.PanicRequest(
-				request,
-				middleware.GetReqID(request.Context()),
-				recovered,
-			)
+			logger.Error(fmt.Sprintf(
+				"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
+			))
 
 			if request.Header.Get("Connection") != "Upgrade" {
 				writer.WriteHeader(http.StatusInternalServerError)

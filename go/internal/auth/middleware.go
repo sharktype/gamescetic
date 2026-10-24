@@ -12,7 +12,6 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
-	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
@@ -23,7 +22,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 	return func(ctx huma.Context, next func(huma.Context)) {
 		neededScopes, _, err := JWTRequirement(ctx.Operation())
 		if err != nil {
-			bugtracker.ReportError(ctx.Context(), "invalid JWT security requirement", err)
+			logger.Error("invalid JWT security requirement", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -39,7 +38,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
 		if err != nil {
-			bugtracker.ReportError(ctx.Context(), "could not load JWT signing keys", err)
+			logger.Error("could not load JWT signing keys", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -69,11 +68,8 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 		}
 
 		if err != nil {
-			bugtracker.ReportError(
-				ctx.Context(),
-				"error resolving user in middleware",
-				err,
-				zap.String("sub", identity.sub),
+			logger.Error(
+				"error resolving user in middleware", zap.Error(err), zap.String("sub", identity.sub),
 			)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
