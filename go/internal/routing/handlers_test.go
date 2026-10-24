@@ -76,7 +76,9 @@ func TestHandle(t *testing.T) {
 
 		api := newTestAPI(t)
 
-		register(logger, api.public, huma.Operation{
+		useLogger(t, logger)
+
+		register(api.public, huma.Operation{
 			OperationID: "GetWrappedError",
 			Method:      http.MethodGet,
 			Path:        "/wrapped-error",
@@ -109,7 +111,9 @@ func TestHandle(t *testing.T) {
 
 		api := newTestAPI(t)
 
-		register(logger, api.public, huma.Operation{
+		useLogger(t, logger)
+
+		register(api.public, huma.Operation{
 			OperationID: "GetPlainError",
 			Method:      http.MethodGet,
 			Path:        "/plain-error",
@@ -213,7 +217,6 @@ func TestHandle(t *testing.T) {
 		authClient := authtest.New(t, dbtest.Provision(t))
 
 		Handle(
-			logger,
 			router,
 			&clients.Clients{DB: unavailable, Auth: authClient.Client},
 			huma.DefaultConfig("test", "1"),

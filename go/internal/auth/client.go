@@ -8,7 +8,6 @@ import (
 	"github.com/jwx-go/jwkfetch/v4"
 	"github.com/lestrrat-go/httprc/v3"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
 )
 
 const jwksMinInterval = 10 * time.Minute
@@ -17,14 +16,13 @@ const jwksMinInterval = 10 * time.Minute
 type Client struct {
 	cache *jwkfetch.Cache
 
-	db     *db.Store
-	logger *zap.Logger
-	cfg    Config
+	db  *db.Store
+	cfg Config
 
 	cancel context.CancelFunc
 }
 
-func New(ctx context.Context, db *db.Store, logger *zap.Logger, cfg Config) (*Client, error) {
+func New(ctx context.Context, db *db.Store, cfg Config) (*Client, error) {
 	cacheCtx, cancelCache := context.WithCancel(ctx)
 
 	cache, err := jwkfetch.NewCache(cacheCtx, httprc.NewClient())
@@ -56,7 +54,6 @@ func New(ctx context.Context, db *db.Store, logger *zap.Logger, cfg Config) (*Cl
 		cancel: cancelCache,
 		cfg:    cfg,
 		db:     db,
-		logger: logger,
 	}, nil
 }
 

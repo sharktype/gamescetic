@@ -12,6 +12,7 @@ import (
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 	"github.com/sharktype/satchel/internal/httpx"
+	appLogger "github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -47,6 +48,8 @@ func testRouter(t *testing.T) *chi.Mux {
 func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 	t.Helper()
 
+	useLogger(t, logger)
+
 	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins: []string{"http://example.com"},
 	})
@@ -54,7 +57,16 @@ func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 		t.Fatal(err)
 	}
 
-	return NewRouter(logger, corsHandler)
+	return NewRouter(corsHandler)
+}
+
+func useLogger(t *testing.T, logger *zap.Logger) {
+	t.Helper()
+
+	previous := appLogger.Global()
+	appLogger.Set(logger)
+
+	t.Cleanup(func() { appLogger.Set(previous) })
 }
 
 func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest.Signer) {
@@ -64,7 +76,6 @@ func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest
 	authClient := authtest.New(t, database)
 
 	Handle(
-		zap.NewNop(),
 		router,
 		&clients.Clients{DB: database, Auth: authClient.Client},
 		huma.DefaultConfig("test", "1"),

@@ -10,39 +10,39 @@ import (
 	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
+	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
 func Handle(
-	logger *zap.Logger,
 	mux *chi.Mux,
 	appClients *clients.Clients,
 	humaConfig huma.Config,
 ) {
 	public, secured := newAPI(mux, humaConfig, appClients.Auth)
 
-	register(logger, public, huma.Operation{
+	register(public, huma.Operation{
 		OperationID: "GetHealth",
 		Summary:     "Get Health",
 		Method:      http.MethodGet,
 		Path:        "/health",
 	}, health.GetHealth)
 
-	register(logger, secured, huma.Operation{
+	register(secured, huma.Operation{
 		OperationID: "GetDatabaseHealth",
 		Summary:     "Get Database Health",
 		Method:      http.MethodGet,
 		Path:        "/health/db",
 	}, health.GetDatabaseHealth(appClients.DB))
 
-	register(logger, secured, huma.Operation{
+	register(secured, huma.Operation{
 		OperationID: "GetAuthHealth",
 		Summary:     "Get Auth Health",
 		Method:      http.MethodGet,
 		Path:        "/health/auth",
 	}, health.GetAuthHealth)
 
-	register(logger, secured, huma.Operation{
+	register(secured, huma.Operation{
 		OperationID: "GetErrorHealth",
 		Summary:     "Get Error Health",
 		Method:      http.MethodGet,
@@ -51,7 +51,6 @@ func Handle(
 }
 
 func register[I, O any](
-	logger *zap.Logger,
 	api huma.API,
 	operation huma.Operation,
 	callback func(context.Context, *I) (*O, error),

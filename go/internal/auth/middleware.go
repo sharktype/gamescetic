@@ -12,6 +12,8 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
+	"github.com/sharktype/satchel/internal/bugtracker"
+	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +23,8 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 	return func(ctx huma.Context, next func(huma.Context)) {
 		neededScopes, _, err := JWTRequirement(ctx.Operation())
 		if err != nil {
-			c.logger.Error("invalid JWT security requirement", zap.Error(err))
+			logger.Error("invalid JWT security requirement", zap.Error(err))
+			bugtracker.Notify(err)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -29,7 +32,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		raw, err := bearerToken(ctx.Header("Authorization"))
 		if err != nil {
-			c.logger.Debug("rejected token", zap.Error(err))
+			logger.Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
@@ -37,7 +40,8 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
 		if err != nil {
-			c.logger.Error("could not load JWT signing keys", zap.Error(err))
+			logger.Error("could not load JWT signing keys", zap.Error(err))
+			bugtracker.Notify(err)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -45,14 +49,14 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		identity, err := verifiedToken(raw, keySet, c.cfg)
 		if err != nil {
-			c.logger.Debug("rejected token", zap.Error(err))
+			logger.Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
 		}
 
 		if !hasAllScopes(identity.token, neededScopes) {
-			c.logger.Debug("token lacks required scopes", zap.String("sub", identity.sub))
+			logger.Debug("token lacks required scopes", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
@@ -60,16 +64,17 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		user, err := c.db.GetUserBySub(ctx.Context(), identity.sub)
 		if errors.Is(err, pgx.ErrNoRows) {
-			c.logger.Warn("verified subject is not provisioned", zap.String("sub", identity.sub))
+			logger.Warn("verified subject is not provisioned", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
 		}
 
 		if err != nil {
-			c.logger.Error(
+			logger.Error(
 				"error resolving user in middleware", zap.String("sub", identity.sub), zap.Error(err),
 			)
+			bugtracker.Notify(err)
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return

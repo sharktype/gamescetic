@@ -8,7 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const flushTimeout = 2 * time.Second
+const (
+	flushTimeout    = 2 * time.Second
+	traceSampleRate = 0.1
+)
 
 func Init(dsn string) (shutdown func()) {
 	if dsn == "" {
@@ -19,7 +22,7 @@ func Init(dsn string) (shutdown func()) {
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
-		TracesSampleRate: 0.1,
+		TracesSampleRate: traceSampleRate,
 	})
 	if err != nil {
 		logger.Fatal("failed to initialize bugtracker", zap.Error(err))

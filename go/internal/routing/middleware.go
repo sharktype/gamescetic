@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 
@@ -8,12 +9,47 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"github.com/sharktype/satchel/internal/bugtracker"
+	"github.com/sharktype/satchel/internal/logger"
+	"go.uber.org/zap"
 )
 
 const (
 	globalRateLimit = 120
 	rateLimitWindow = time.Minute
 )
+
+func recoverer() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+			defer func() {
+				recovered := recover()
+				if recovered == nil {
+					return
+				}
+
+				if recovered == http.ErrAbortHandler {
+					panic(recovered)
+				}
+
+				logger.Error(
+					"request handler panicked",
+					zap.Any("panic", recovered),
+					zap.Stack("stack"),
+				)
+				bugtracker.Notify(fmt.Errorf(
+					"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
+				))
+
+				if request.Header.Get("Connection") != "Upgrade" {
+					writer.WriteHeader(http.StatusInternalServerError)
+				}
+			}()
+
+			next.ServeHTTP(writer, request)
+		})
+	}
+}
 
 // rateLimitGlobally throttles every request from one client IP.
 //

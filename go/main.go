@@ -16,7 +16,7 @@ import (
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
-	appLogger "github.com/sharktype/satchel/internal/logger"
+	internalLogger "github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
 	"go.uber.org/zap"
 )
@@ -43,16 +43,14 @@ func run() (err error) {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	logger, err := appLogger.New(appLogger.Config{
+	shutdownLogger, err := internalLogger.Init(internalLogger.Config{
 		Production: cfg.Production,
 		Verbose:    cfg.Verbose,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating logger: %w", err)
 	}
-	defer func() { _ = logger.Sync() }()
-
-	// Initialise bugtracker:
+	defer shutdownLogger()
 
 	if cfg.Telemetry.SentryDSN != "" {
 		shutdownBugtracker := bugtracker.Init(cfg.Telemetry.SentryDSN)
@@ -68,17 +66,14 @@ func run() (err error) {
 		}
 	}()
 
-	// Initialise app clients:
-
 	if cfg.Production {
-		logger.Info("app booting in production mode...")
+		internalLogger.Info("app booting in production mode...")
 	} else {
-		logger.Info("app booting in development mode...")
+		internalLogger.Info("app booting in development mode...")
 	}
 
 	appClients, err := clients.New(
 		context.Background(),
-		logger,
 		db.Config{DSN: cfg.Clients.DB.DSN},
 		auth.Config{
 			JWKSURL:  cfg.Auth.JWKSURL,
@@ -90,8 +85,6 @@ func run() (err error) {
 		return fmt.Errorf("error creating clients: %w", err)
 	}
 	defer appClients.Close()
-
-	// Initialise router:
 
 	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins:   cfg.CORS.AllowedOrigins,
@@ -105,16 +98,13 @@ func run() (err error) {
 		return err
 	}
 
-	router := routing.NewRouter(logger, corsHandler)
+	router := routing.NewRouter(corsHandler)
 
 	routing.Handle(
-		logger,
 		router,
 		appClients,
 		huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
 	)
-
-	// Initialise server:
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -135,12 +125,12 @@ func run() (err error) {
 	defer stop()
 
 	// ListenAndServe blocks until the server stops, so it runs in the background and reports why
-	// it stopped on serveErr.
+	// it stopped on receiving at serveErr.
 
 	serveErr := make(chan error, 1)
 
 	go func() {
-		logger.Info("starting server", zap.Int("port", cfg.Port))
+		internalLogger.Info("starting server", zap.Int("port", cfg.Port))
 		serveErr <- server.ListenAndServe()
 	}()
 
@@ -156,7 +146,7 @@ func run() (err error) {
 
 	// Graceful shutdown:
 
-	logger.Info("shutting down server...")
+	internalLogger.Info("shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()

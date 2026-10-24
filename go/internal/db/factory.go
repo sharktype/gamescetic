@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -14,7 +15,7 @@ const (
 	startupTimeout = 10 * time.Second
 )
 
-func NewPool(ctx context.Context, logger *zap.Logger, cfg Config) (*pgxpool.Pool, error) {
+func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 	logger.Debug("connecting to database and testing connection...", zap.String("driver", driver))
 
 	startupCtx, cancel := context.WithTimeout(ctx, startupTimeout)
