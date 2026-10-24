@@ -19,6 +19,13 @@ FROM alpine:3 AS runner
 WORKDIR /app
 
 COPY --from=builder /app/main .
+
+#
+# Add to your post-deploy:
+#
+#   goose -dir ./sql/migrations postgres "$CLIENTS_DB_DSN" up
+#
+
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
 COPY sql/migrations/ ./sql/migrations/
 

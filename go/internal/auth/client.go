@@ -32,7 +32,12 @@ func New(ctx context.Context, db *db.Store, cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("failed to create jwk cache: %w", err)
 	}
 
-	err = cache.Register(cacheCtx, cfg.JWKSURL, jwkfetch.WithMinInterval(jwksMinInterval))
+	err = cache.Register(
+		cacheCtx,
+		cfg.JWKSURL,
+		jwkfetch.WithMinInterval(jwksMinInterval),
+		jwkfetch.WithWaitReady(false),
+	)
 	if err != nil {
 		cancelCache()
 
