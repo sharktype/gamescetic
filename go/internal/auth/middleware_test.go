@@ -3,8 +3,10 @@ package auth_test
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2/humatest"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db"
@@ -71,6 +73,33 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 			name: "a token without a subject is rejected",
 			token: func(t *testing.T, signer *authtest.Signer) string {
 				return signer.Token(t, "")
+			},
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "an expired token is rejected",
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+					jwt.ExpirationKey: time.Now().Add(-time.Minute),
+				})
+			},
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "a token from another issuer is rejected",
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+					jwt.IssuerKey: "other-issuer",
+				})
+			},
+			expectedStatus: http.StatusUnauthorized,
+		},
+		{
+			name: "a token for another audience is rejected",
+			token: func(t *testing.T, signer *authtest.Signer) string {
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+					jwt.AudienceKey: []string{"other-audience"},
+				})
 			},
 			expectedStatus: http.StatusUnauthorized,
 		},

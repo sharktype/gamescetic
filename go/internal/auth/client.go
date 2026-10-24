@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jwx-go/jwkfetch/v4"
 	"github.com/lestrrat-go/httprc/v3"
-	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
 )
@@ -15,7 +15,7 @@ const jwksMinInterval = 10 * time.Minute
 
 // Client verifies tokens against the IDP's published keys and resolves the caller to a user.
 type Client struct {
-	cache *jwk.Cache
+	cache *jwkfetch.Cache
 
 	db     *db.Store
 	logger *zap.Logger
@@ -27,14 +27,14 @@ type Client struct {
 func New(ctx context.Context, db *db.Store, logger *zap.Logger, cfg Config) (*Client, error) {
 	cacheCtx, cancelCache := context.WithCancel(ctx)
 
-	cache, err := jwk.NewCache(cacheCtx, httprc.NewClient())
+	cache, err := jwkfetch.NewCache(cacheCtx, httprc.NewClient())
 	if err != nil {
 		cancelCache()
 
 		return nil, fmt.Errorf("failed to create jwk cache: %w", err)
 	}
 
-	err = cache.Register(cacheCtx, cfg.JWKSURL, jwk.WithMinInterval(jwksMinInterval))
+	err = cache.Register(cacheCtx, cfg.JWKSURL, jwkfetch.WithMinInterval(jwksMinInterval))
 	if err != nil {
 		cancelCache()
 

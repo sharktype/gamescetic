@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
@@ -39,7 +39,7 @@ func NewSigner(t testing.TB) *Signer {
 		t.Fatal(err)
 	}
 
-	key, err := jwk.Import(privateKey)
+	key, err := jwk.Import[jwk.Key](privateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,6 +105,12 @@ func (s *Signer) Token(t testing.TB, sub string) string {
 }
 
 func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) string {
+	return s.TokenWithClaims(t, sub, scopes, nil)
+}
+
+func (s *Signer) TokenWithClaims(
+	t testing.TB, sub string, scopes []string, claims map[string]any,
+) string {
 	t.Helper()
 
 	token := jwt.New()
@@ -127,6 +133,12 @@ func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) stri
 
 	if scopes != nil {
 		if err := token.Set("scope", strings.Join(scopes, " ")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for name, value := range claims {
+		if err := token.Set(name, value); err != nil {
 			t.Fatal(err)
 		}
 	}

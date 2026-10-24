@@ -9,9 +9,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/jackc/pgx/v5"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jws"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jws"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"go.uber.org/zap"
 )
 
@@ -139,8 +139,8 @@ func hasAllScopes(token jwt.Token, wanted []string) bool {
 }
 
 func grantedScopes(token jwt.Token) []string {
-	var scope string
-	if err := token.Get("scope", &scope); err != nil {
+	scope, err := jwt.Get[string](token, "scope")
+	if err != nil {
 		return nil
 	}
 
