@@ -236,23 +236,7 @@ func TestNewRouter(t *testing.T) {
 
 		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
 
-		for i := range globalRateLimit {
-			if code := getFrom(router, "/ping", "1.0.0.1").Code; code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := getFrom(router, "/ping", "1.0.0.1").Code; code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
-		}
-
-		if code := getFrom(router, "/ping", "9.9.9.9, 1.0.0.1").Code; code != http.StatusTooManyRequests {
-			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
-		}
-
-		if code := getFrom(router, "/ping", "1.0.0.2").Code; code != http.StatusOK {
-			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
-		}
+		assertLimitedPerClient(t, router, "/ping", globalRateLimit)
 	})
 }
 
@@ -311,18 +295,6 @@ func TestRateLimit(t *testing.T) {
 
 		authtest.RegisterProbe(api.public, nil)
 
-		for i := range publicRateLimit {
-			if code := getFrom(api.router, authtest.ProbePath, "1.0.0.1").Code; code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := getFrom(api.router, authtest.ProbePath, "9.9.9.9, 1.0.0.1").Code; code != http.StatusTooManyRequests {
-			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
-		}
-
-		if code := getFrom(api.router, authtest.ProbePath, "1.0.0.2").Code; code != http.StatusOK {
-			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
-		}
+		assertLimitedPerClient(t, api.router, authtest.ProbePath, publicRateLimit)
 	})
 }

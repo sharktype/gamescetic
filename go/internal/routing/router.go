@@ -59,24 +59,9 @@ func newAPI(
 func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
-	// We make the assumption that either the API sits behind exactly one proxy e.g. Cloudflare, or
-	// the service is deployed as a standalone server communicating over HTTP, either in
-	// client-trusted environments or in a private Docker network.
-	//
-	// The proxy is expected to append the client to X-Forwarded-For and cannot be directly
-	// modified by the client; if it is, only the rightmost hop is trusted so a prepended value is
-	// ignored/dropped and replaced with the actual client IP. Anything that doesn't append the
-	// XFF header must therefore be trusted or rate limits can be bypassed by a slightly crafty
-	// attacker.
-	//
-	// As always, a reminder: production deployments should put a "real" rate limiter at the edge
-	// layer and not rely on this basic middleware implementation, especially when there are
-	// multiple replicas behind a load balancer.
-
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
-	router.Use(middleware.ClientIPFromXFF())
-	router.Use(realIP)
+	router.Use(clientIP)
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
 		Logger: zap.NewStdLog(logger),
 	}))
