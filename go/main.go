@@ -11,6 +11,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
+	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
@@ -20,16 +21,14 @@ import (
 	"go.uber.org/zap"
 )
 
-const readHeaderTimeout = 5 * time.Second
-const readTimeout = 30 * time.Second
-const idleTimeout = 120 * time.Second
-
-// These have to outlast the router's middleware.Timeout so responses are fully written and
-// in-flight requests are drained before the server gives up.
-
-const graceMargin = 10 * time.Second
-const writeTimeout = routing.RequestTimeout + graceMargin
-const shutdownTimeout = routing.RequestTimeout + graceMargin
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 30 * time.Second
+	idleTimeout       = 120 * time.Second
+	graceMargin       = 10 * time.Second
+	writeTimeout      = routing.RequestTimeout + graceMargin
+	shutdownTimeout   = routing.RequestTimeout + graceMargin
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -54,6 +53,14 @@ func run() error {
 		return fmt.Errorf("error creating logger: %w", err)
 	}
 	defer func() { _ = logger.Sync() }()
+
+	// Initialise bugtracker:
+
+	if cfg.Telemetry.SentryDSN != "" {
+		shutdownBugtracker := bugtracker.Init(logger, cfg.Telemetry.SentryDSN)
+
+		defer shutdownBugtracker()
+	}
 
 	// Initialise app clients:
 
