@@ -73,9 +73,23 @@ func TestRecoverer(t *testing.T) {
 			t.Fatalf("got %d events, want 1", len(transport.events))
 		}
 
-		exceptions := transport.events[0].Exception
+		event := transport.events[0]
+
+		if event.Request == nil || event.Request.Method != http.MethodGet {
+			t.Fatalf("got request %+v, want the panicking request", event.Request)
+		}
+
+		if event.Tags["request_id"] == "" {
+			t.Fatal("the event lost the request ID")
+		}
+
+		exceptions := event.Exception
 		if len(exceptions) != 1 || !strings.Contains(exceptions[0].Value, "arbitrary panic") {
 			t.Fatalf("got exceptions %v, want the panic", exceptions)
+		}
+
+		if exceptions[0].Stacktrace == nil {
+			t.Fatal("the event lost the stack trace")
 		}
 	})
 }

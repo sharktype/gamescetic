@@ -62,7 +62,7 @@ func run() (err error) {
 
 	defer func() {
 		if err != nil {
-			bugtracker.Report(err)
+			bugtracker.ReportError(err)
 		}
 	}()
 
@@ -135,7 +135,7 @@ func run() (err error) {
 	}()
 
 	select {
-	case err := <-serveErr:
+	case err = <-serveErr:
 		return fmt.Errorf("server stopped unexpectedly: %w", err)
 	case <-signalCtx.Done():
 	}

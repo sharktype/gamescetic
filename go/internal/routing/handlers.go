@@ -77,7 +77,7 @@ func register[I, O any](
 			}
 		}
 
-		bugtracker.Report(fmt.Errorf(
+		bugtracker.ReportError(fmt.Errorf(
 			"handler %s failed with status %d: %w",
 			operation.OperationID, status, reportErr,
 		))

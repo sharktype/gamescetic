@@ -2,6 +2,7 @@ package bugtracker
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -36,7 +37,27 @@ func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 	}, nil
 }
 
-func Report(err error) {
+func ReportError(err error) {
 	logger.Error(err.Error())
+
 	sentry.CaptureException(err)
+}
+
+func PanicRequest(request *http.Request, requestID string, recovered any) {
+	logger.Error(fmt.Sprintf(
+		"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
+	))
+
+	event := sentry.NewEvent()
+	event.Level = sentry.LevelError
+	event.Message = fmt.Sprintf("panic serving %s %s", request.Method, request.URL.Path)
+	event.Request = sentry.NewRequest(request)
+	event.Tags = map[string]string{"request_id": requestID}
+	event.Exception = []sentry.Exception{{
+		Type:       fmt.Sprintf("%T", recovered),
+		Value:      fmt.Sprint(recovered),
+		Stacktrace: sentry.NewStacktrace(),
+	}}
+
+	sentry.CaptureEvent(event)
 }

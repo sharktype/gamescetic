@@ -66,7 +66,7 @@ func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
 		Logger: zap.NewStdLog(logger.Global()),
 	}))
-	router.Use(recoverer())
+	router.Use(recoverer)
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)
 	router.Use(middleware.GetHead)

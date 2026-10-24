@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -17,31 +16,31 @@ const (
 	rateLimitWindow = time.Minute
 )
 
-func recoverer() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-			defer func() {
-				recovered := recover()
-				if recovered == nil {
-					return
-				}
+func recoverer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		defer func() {
+			recovered := recover()
+			if recovered == nil {
+				return
+			}
 
-				if recovered == http.ErrAbortHandler {
-					panic(recovered)
-				}
+			if recovered == http.ErrAbortHandler {
+				panic(recovered)
+			}
 
-				bugtracker.Report(fmt.Errorf(
-					"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
-				))
+			bugtracker.PanicRequest(
+				request,
+				middleware.GetReqID(request.Context()),
+				recovered,
+			)
 
-				if request.Header.Get("Connection") != "Upgrade" {
-					writer.WriteHeader(http.StatusInternalServerError)
-				}
-			}()
+			if request.Header.Get("Connection") != "Upgrade" {
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
 
-			next.ServeHTTP(writer, request)
-		})
-	}
+		next.ServeHTTP(writer, request)
+	})
 }
 
 // rateLimitGlobally throttles every request from one client IP.
