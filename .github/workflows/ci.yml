@@ -1,9 +1,8 @@
 name: Satchel CI/CD
 
 on:
-    push:
-    pull_request:
     workflow_dispatch:
+    push:
 
 concurrency:
     cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
