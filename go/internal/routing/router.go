@@ -13,6 +13,7 @@ import (
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 const (
@@ -59,6 +60,12 @@ func newAPI(
 func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
+	router.Use(otelhttp.NewMiddleware(
+		"",
+		otelhttp.WithSpanNameFormatter(func(_ string, request *http.Request) string {
+			return request.Method + " " + request.URL.Path
+		}),
+	))
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(clientIP)
@@ -72,9 +79,6 @@ func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router.Use(middleware.Timeout(RequestTimeout))
 	router.Use(middleware.Compress(compressionLevel))
 	router.Use(corsMiddleware)
-
-	// Counts per replica so remember to keep volumetric throttling at the edge too.
-
 	router.Use(rateLimitGlobally)
 	router.Use(middleware.Heartbeat("/ping"))
 

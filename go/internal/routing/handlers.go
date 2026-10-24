@@ -65,8 +65,7 @@ func register[I, O any](
 		status := http.StatusInternalServerError
 		reportErr := err
 
-		var statusErr huma.StatusError
-		if errors.As(err, &statusErr) {
+		if statusErr, ok := errors.AsType[huma.StatusError](err); ok {
 			status = statusErr.GetStatus()
 			if status < http.StatusInternalServerError {
 				return result, err
@@ -78,6 +77,7 @@ func register[I, O any](
 		}
 
 		bugtracker.ReportError(
+			ctx,
 			"handler failed",
 			reportErr,
 			zap.String("operation", operation.OperationID),

@@ -2,6 +2,7 @@ package health
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -66,5 +67,7 @@ func GetDatabaseHealth(
 }
 
 func GetErrorHealth(_ context.Context, _ *GetHealthInput) (*GetHealthOutput, error) {
-	return nil, huma.Error500InternalServerError("intentional error for health check")
+	err := errors.New("intentional error for health check")
+
+	return nil, huma.Error500InternalServerError(err.Error())
 }
