@@ -79,7 +79,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		{
 			name: "an expired token is rejected",
 			token: func(t *testing.T, signer *authtest.Signer) string {
-				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, map[string]any{
 					jwt.ExpirationKey: time.Now().Add(-time.Minute),
 				})
 			},
@@ -88,7 +88,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		{
 			name: "a token from another issuer is rejected",
 			token: func(t *testing.T, signer *authtest.Signer) string {
-				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, map[string]any{
 					jwt.IssuerKey: "other-issuer",
 				})
 			},
@@ -97,7 +97,7 @@ func TestNewJWTAuthMiddleware(t *testing.T) {
 		{
 			name: "a token for another audience is rejected",
 			token: func(t *testing.T, signer *authtest.Signer) string {
-				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, nil, map[string]any{
+				return signer.TokenWithClaims(t, dbtest.ProvisionedUser().Sub, map[string]any{
 					jwt.AudienceKey: []string{"other-audience"},
 				})
 			},

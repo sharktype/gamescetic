@@ -101,16 +101,21 @@ func (s *Signer) publicJWKS(t testing.TB) []byte {
 func (s *Signer) Token(t testing.TB, sub string) string {
 	t.Helper()
 
-	return s.TokenWithScopes(t, sub, nil)
+	return s.TokenWithClaims(t, sub, nil)
 }
 
 func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) string {
-	return s.TokenWithClaims(t, sub, scopes, nil)
+	t.Helper()
+
+	var claims map[string]any
+	if scopes != nil {
+		claims = map[string]any{"scope": strings.Join(scopes, " ")}
+	}
+
+	return s.TokenWithClaims(t, sub, claims)
 }
 
-func (s *Signer) TokenWithClaims(
-	t testing.TB, sub string, scopes []string, claims map[string]any,
-) string {
+func (s *Signer) TokenWithClaims(t testing.TB, sub string, claims map[string]any) string {
 	t.Helper()
 
 	token := jwt.New()
@@ -129,12 +134,6 @@ func (s *Signer) TokenWithClaims(
 
 	if err := token.Set(jwt.ExpirationKey, time.Now().Add(time.Hour)); err != nil {
 		t.Fatal(err)
-	}
-
-	if scopes != nil {
-		if err := token.Set("scope", strings.Join(scopes, " ")); err != nil {
-			t.Fatal(err)
-		}
 	}
 
 	for name, value := range claims {
