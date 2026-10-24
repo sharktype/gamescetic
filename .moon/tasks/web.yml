@@ -16,6 +16,14 @@ fileGroups:
         - "**/*.{gen,generated}.{ts,tsx}"
 
 tasks:
+    install:
+        command: "pnpm install"
+        inputs:
+            - "package.json"
+            - "pnpm-lock.yaml"
+        outputs:
+            - "node_modules"
+
     typecheck:
         command: "pnpm run typecheck"
         inputs:
