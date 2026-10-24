@@ -8,7 +8,6 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	sentryotel "github.com/getsentry/sentry-go/otel"
-	sentryotlp "github.com/getsentry/sentry-go/otel/otlp"
 	"github.com/sharktype/satchel/internal/logger"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -47,17 +46,10 @@ func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 		return nil, fmt.Errorf("failed to initialize sentry: %w", err)
 	}
 
-	// Captured errors are linked to the active span so the tracer provider must be global.
-
-	exporter, err := sentryotlp.NewTraceExporter(context.Background(), dsn)
-	if err != nil {
-		sentry.Flush(flushTimeout)
-
-		return nil, fmt.Errorf("failed to initialize trace exporter: %w", err)
-	}
-
+	// Errors captured by Sentry are linked to the active OTel span, so the tracer provider
+	// must be installed globally.
 	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
+		sdktrace.WithSpanProcessor(newSentrySpanProcessor()),
 		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(traceSampleRate))),
 	)
 	otel.SetTracerProvider(tracerProvider)
