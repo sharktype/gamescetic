@@ -28,7 +28,7 @@ func TestNewConfig(t *testing.T) {
 		setRequiredEnv(t)
 		t.Setenv("VERBOSE", "true")
 		t.Setenv("PORT", "8080")
-		t.Setenv("TELEMETRY_SENTRY_DSN", "https://public@example.com/1")
+		t.Setenv("TELEMETRY_SENTRY_DSN", "https://test@example.com/1")
 
 		cfg, err := New()
 		if err != nil {
