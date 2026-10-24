@@ -28,7 +28,11 @@ func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 		return func() {}, nil
 	}
 
-	err = sentry.Init(sentry.ClientOptions{Dsn: dsn, TracesSampleRate: traceSampleRate})
+	err = sentry.Init(sentry.ClientOptions{
+		Dsn:              dsn,
+		TracesSampleRate: traceSampleRate,
+		BeforeSend:       addSourceContext,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize sentry: %w", err)
 	}
