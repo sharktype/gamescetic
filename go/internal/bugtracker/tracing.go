@@ -429,7 +429,7 @@ func mapStatus(span sdktrace.ReadOnlySpan, attributes map[string]attribute.Value
 	}
 
 	if code, ok := attributes[rpcGRPCStatusCodeKey]; ok {
-		if status, found := canonicalGRPCStatuses[code.Emit()]; found {
+		if status, found := canonicalGRPCStatuses[code.String()]; found {
 			return status
 		}
 	}
