@@ -8,6 +8,11 @@ fileGroups:
         - "*.config.{js,cjs,mjs,ts}"
         - "tsconfig*.json"
         - "package.json"
+    workspace:
+        - "/web/package.json"
+        - "/web/libs/*/package.json"
+        - "/web/pnpm-lock.yaml"
+        - "/web/pnpm-workspace.yaml"
     sources:
         - "src/**/*"
     tests:
@@ -19,8 +24,7 @@ tasks:
     install:
         command: "pnpm install"
         inputs:
-            - "package.json"
-            - "pnpm-lock.yaml"
+            - "@group(workspace)"
         outputs:
             - "node_modules"
 
