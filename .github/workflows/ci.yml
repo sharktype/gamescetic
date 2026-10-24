@@ -39,6 +39,14 @@ jobs:
               with:
                   auto-install: true
                   auto-setup: true
+            - uses: actions/cache@v4
+              with:
+                  path: |
+                      ~/.cache/go-build
+                      ~/go/pkg/mod
+                  key: ${{ runner.os }}-go-${{ hashFiles('go/go.sum', 'go/tools/go.sum') }}
+                  restore-keys: |
+                      ${{ runner.os }}-go-
             - run: moon run go:install
             - run: moon run go:install-tools
             - name: add Go tools to PATH
@@ -65,6 +73,12 @@ jobs:
               with:
                   auto-install: true
                   auto-setup: true
+            - uses: actions/cache@v4
+              with:
+                  path: ~/.local/share/pnpm/store
+                  key: ${{ runner.os }}-pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
+                  restore-keys: |
+                      ${{ runner.os }}-pnpm-
             - run: moon run web:install
             - run: moon run web:build
             - run: moon run web:lint-check
