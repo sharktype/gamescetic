@@ -13,9 +13,15 @@ const (
 	traceSampleRate = 0.1
 )
 
-func Init(dsn string) (shutdown func(), err error) {
+func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 	if dsn == "" {
 		logger.Info("no DSN provided, skipping bugtracker")
+
+		return func() {}, nil
+	}
+
+	if !isProduction {
+		logger.Warn("Sentry DSN provided outside production environment, skipping bugtracker")
 
 		return func() {}, nil
 	}

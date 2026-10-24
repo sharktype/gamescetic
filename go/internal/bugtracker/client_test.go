@@ -1,10 +1,14 @@
 package bugtracker
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/getsentry/sentry-go"
+)
 
 func TestInit(t *testing.T) {
 	t.Run("an empty DSN disables the bugtracker", func(t *testing.T) {
-		shutdown, err := Init("")
+		shutdown, err := Init("", true)
 		if err != nil {
 			t.Fatalf("got error %v, want none", err)
 		}
@@ -12,8 +16,23 @@ func TestInit(t *testing.T) {
 		shutdown()
 	})
 
+	t.Run("a DSN outside production is ignored", func(t *testing.T) {
+		sentry.CurrentHub().BindClient(nil)
+
+		shutdown, err := Init("https://public@example.com/1", false)
+		if err != nil {
+			t.Fatalf("got error %v, want none", err)
+		}
+
+		shutdown()
+
+		if sentry.CurrentHub().Client().IsEnabled() {
+			t.Fatal("the bugtracker was initialized outside production")
+		}
+	})
+
 	t.Run("an invalid DSN is rejected", func(t *testing.T) {
-		shutdown, err := Init("not-a-dsn")
+		shutdown, err := Init("not-a-dsn", true)
 		if err == nil {
 			t.Fatal("expected an error")
 		}

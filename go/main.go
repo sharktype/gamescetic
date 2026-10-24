@@ -52,7 +52,7 @@ func run() (err error) {
 	}
 	defer shutdownLogger()
 
-	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN)
+	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN, cfg.Production)
 	if err != nil {
 		return fmt.Errorf("error creating bugtracker: %w", err)
 	}
