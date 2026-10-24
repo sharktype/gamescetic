@@ -30,7 +30,7 @@ func newTestAPI(t *testing.T) testAPI {
 
 	authClient := authtest.New(t, dbtest.NewClosed(t))
 
-	router := chi.NewMux()
+	router := testRouter(t)
 	public, secured := newAPI(
 		router, huma.DefaultConfig("test", "0.0.0"), authClient.Client,
 	)

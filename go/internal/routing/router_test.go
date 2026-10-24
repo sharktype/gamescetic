@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/auth/authtest"
 	"github.com/sharktype/satchel/internal/db/dbtest"
@@ -326,14 +325,12 @@ func TestRateLimit(t *testing.T) {
 
 		authtest.RegisterProbe(api.public, nil)
 
-		handler := middleware.ClientIPFromXFF()(api.router)
-
 		request := func(forwardedFor string) int {
 			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
 			request.Header.Set("X-Forwarded-For", forwardedFor)
 
 			response := httptest.NewRecorder()
-			handler.ServeHTTP(response, request)
+			api.router.ServeHTTP(response, request)
 
 			return response.Code
 		}
