@@ -23,8 +23,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 	return func(ctx huma.Context, next func(huma.Context)) {
 		neededScopes, _, err := JWTRequirement(ctx.Operation())
 		if err != nil {
-			logger.Error("invalid JWT security requirement", zap.Error(err))
-			bugtracker.Notify(err)
+			bugtracker.Report(fmt.Errorf("invalid JWT security requirement: %w", err))
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -40,8 +39,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		keySet, err := c.cache.Lookup(ctx.Context(), c.cfg.JWKSURL)
 		if err != nil {
-			logger.Error("could not load JWT signing keys", zap.Error(err))
-			bugtracker.Notify(err)
+			bugtracker.Report(fmt.Errorf("could not load JWT signing keys: %w", err))
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return
@@ -71,10 +69,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 		}
 
 		if err != nil {
-			logger.Error(
-				"error resolving user in middleware", zap.String("sub", identity.sub), zap.Error(err),
-			)
-			bugtracker.Notify(err)
+			bugtracker.Report(fmt.Errorf("resolving user %q: %w", identity.sub, err))
 			_ = huma.WriteErr(api, ctx, http.StatusInternalServerError, "Internal Server Error")
 
 			return

@@ -52,17 +52,17 @@ func run() (err error) {
 	}
 	defer shutdownLogger()
 
-	if cfg.Telemetry.SentryDSN != "" {
-		shutdownBugtracker := bugtracker.Init(cfg.Telemetry.SentryDSN)
-
-		defer shutdownBugtracker()
+	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN)
+	if err != nil {
+		return fmt.Errorf("error creating bugtracker: %w", err)
 	}
+	defer shutdownBugtracker()
 
 	// We actually do want to capture startup errors in telemetry.
 
 	defer func() {
 		if err != nil {
-			bugtracker.Notify(err)
+			bugtracker.Report(err)
 		}
 	}()
 

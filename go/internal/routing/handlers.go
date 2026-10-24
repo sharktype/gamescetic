@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -10,8 +11,6 @@ import (
 	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
-	"github.com/sharktype/satchel/internal/logger"
-	"go.uber.org/zap"
 )
 
 func Handle(
@@ -61,38 +60,27 @@ func register[I, O any](
 			return result, nil
 		}
 
+		// Huma returns a 500 for any error that is not a status error.
+
+		status := http.StatusInternalServerError
+		reportErr := err
+
 		var statusErr huma.StatusError
-		if !errors.As(err, &statusErr) {
-			// Huma turns this into a 500.
+		if errors.As(err, &statusErr) {
+			status = statusErr.GetStatus()
+			if status < http.StatusInternalServerError {
+				return result, err
+			}
 
-			logger.Error(
-				"handler failed",
-				zap.String("operation", operation.OperationID),
-				zap.Error(err),
-			)
-
-			bugtracker.Notify(err)
-
-			return result, err
+			if cause := errors.Unwrap(statusErr); cause != nil {
+				reportErr = cause
+			}
 		}
 
-		if statusErr.GetStatus() < http.StatusInternalServerError {
-			return result, err
-		}
-
-		logErr := err
-		if cause := errors.Unwrap(statusErr); cause != nil {
-			logErr = cause
-		}
-
-		logger.Error(
-			"handler failed",
-			zap.String("operation", operation.OperationID),
-			zap.Int("status", statusErr.GetStatus()),
-			zap.Error(logErr),
-		)
-
-		bugtracker.Notify(logErr)
+		bugtracker.Report(fmt.Errorf(
+			"handler %s failed with status %d: %w",
+			operation.OperationID, status, reportErr,
+		))
 
 		return result, err
 	})

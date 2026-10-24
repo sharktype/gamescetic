@@ -10,8 +10,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/bugtracker"
-	"github.com/sharktype/satchel/internal/logger"
-	"go.uber.org/zap"
 )
 
 const (
@@ -32,12 +30,7 @@ func recoverer() func(http.Handler) http.Handler {
 					panic(recovered)
 				}
 
-				logger.Error(
-					"request handler panicked",
-					zap.Any("panic", recovered),
-					zap.Stack("stack"),
-				)
-				bugtracker.Notify(fmt.Errorf(
+				bugtracker.Report(fmt.Errorf(
 					"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
 				))
 

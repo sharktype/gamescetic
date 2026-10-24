@@ -93,15 +93,16 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusServiceUnavailable)
 		}
 
-		entries := logs.FilterMessage("handler failed").All()
+		entries := logs.All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d matching log entries, want 1", len(entries))
+			t.Fatalf("got %d log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "connection refused",
-		) {
-			t.Fatalf("the log entry lost the cause: %q", logged)
+		message := entries[0].Message
+		if !strings.Contains(message, "connection refused") ||
+			!strings.Contains(message, "GetWrappedError") ||
+			!strings.Contains(message, "503") {
+			t.Fatalf("the log entry lost context: %q", message)
 		}
 	})
 
@@ -126,15 +127,13 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", response.Code, http.StatusInternalServerError)
 		}
 
-		entries := logs.FilterMessage("handler failed").All()
+		entries := logs.All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d matching log entries, want 1", len(entries))
+			t.Fatalf("got %d log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "intentional failure",
-		) {
-			t.Fatalf("the log entry lost the error: %q", logged)
+		if message := entries[0].Message; !strings.Contains(message, "intentional failure") {
+			t.Fatalf("the log entry lost the error: %q", message)
 		}
 	})
 
@@ -233,15 +232,13 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("the response leaks the cause: %q", response.Body.String())
 		}
 
-		entries := logs.FilterMessage("handler failed").All()
+		entries := logs.All()
 		if len(entries) != 1 {
-			t.Fatalf("got %d matching log entries, want 1", len(entries))
+			t.Fatalf("got %d log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, cause.Error(),
-		) {
-			t.Fatalf("the log entry lost the cause: %q", logged)
+		if message := entries[0].Message; !strings.Contains(message, cause.Error()) {
+			t.Fatalf("the log entry lost the cause: %q", message)
 		}
 	})
 }
