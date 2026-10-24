@@ -13,6 +13,7 @@
 			"groupName": "chore: dev dependencies safe update",
 			"matchDepTypes": ["devDependencies"],
 			"matchUpdateTypes": ["patch", "minor"],
+			"matchCurrentVersion": "!/^v?0\\./",
 			"automerge": true,
 			"automergeType": "branch"
 		},
@@ -20,6 +21,7 @@
 			"groupName": "task: dependencies safe update",
 			"matchDepTypes": ["dependencies"],
 			"matchUpdateTypes": ["patch", "minor"],
+			"matchCurrentVersion": "!/^v?0\\./",
 			"automerge": true,
 			"automergeType": "branch"
 		},
@@ -27,6 +29,7 @@
 			"groupName": "task: peer dependencies safe update",
 			"matchDepTypes": ["peerDependencies"],
 			"matchUpdateTypes": ["patch", "minor"],
+			"matchCurrentVersion": "!/^v?0\\./",
 			"automerge": true,
 			"automergeType": "branch"
 		},
@@ -34,6 +37,7 @@
 			"groupName": "task: go dependencies safe update",
 			"matchManagers": ["gomod"],
 			"matchUpdateTypes": ["patch", "minor"],
+			"matchCurrentVersion": "!/^v?0\\./",
 			"automerge": true,
 			"automergeType": "branch"
 		},
