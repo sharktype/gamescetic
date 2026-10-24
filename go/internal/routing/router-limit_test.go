@@ -39,29 +39,7 @@ func TestRateLimit(t *testing.T) {
 
 		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
 
-		request := func(forwardedFor string) int {
-			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
-			request.Header.Set("X-Forwarded-For", forwardedFor)
-
-			response := httptest.NewRecorder()
-			router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
-		for i := range globalRateLimit {
-			if code := request("1.0.0.1"); code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := request("1.0.0.1"); code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
-		}
-
-		if code := request("1.0.0.2"); code != http.StatusOK {
-			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
-		}
+		assertLimitedPerClient(t, router, "/ping", globalRateLimit)
 	})
 
 	t.Run("limits by operation rather than URL path", func(t *testing.T) {
@@ -118,10 +96,7 @@ func TestRateLimit(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
 			request.RemoteAddr = "not-an-address-" + strconv.Itoa(i)
 
-			response := httptest.NewRecorder()
-			api.router.ServeHTTP(response, request)
-
-			return response.Code
+			return serve(api.router, request).Code
 		}
 
 		for i := range publicRateLimit {
@@ -133,5 +108,13 @@ func TestRateLimit(t *testing.T) {
 		if code := request(publicRateLimit); code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
+	})
+
+	t.Run("the operation limiter is per client behind the proxy", func(t *testing.T) {
+		api := newTestAPI(t)
+
+		authtest.RegisterProbe(api.public, nil)
+
+		assertLimitedPerClient(t, api.router, authtest.ProbePath, publicRateLimit)
 	})
 }

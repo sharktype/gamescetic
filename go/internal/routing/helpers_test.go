@@ -108,10 +108,6 @@ func serve(router http.Handler, request *http.Request) *httptest.ResponseRecorde
 	return response
 }
 
-// assertLimitedPerClient asserts rate limits are enforced in tests.
-//
-// It exhausts one client's limit on path, then checks that the bucket follows the trusted client
-// address rather than anything the client can forge.
 func assertLimitedPerClient(t *testing.T, router http.Handler, path string, limit int) {
 	t.Helper()
 
