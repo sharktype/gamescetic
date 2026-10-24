@@ -24,6 +24,8 @@ tasks:
         script: "go mod download && go mod tidy"
         inputs:
             - "@group(configs)"
+        options:
+            cache: false
 
     build:
         command: "go build -o bin/ ./..."

@@ -16,6 +16,8 @@ tasks:
         command: "pnpm install"
         inputs:
             - "@group(workspace)"
+        options:
+            cache: false
 
     build:
         command: "pnpm run build"
