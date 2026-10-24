@@ -27,6 +27,12 @@ tasks:
         options:
             cache: false
 
+    install-tools:
+        script: "go install -C ./tools tool"
+        preset: "utility"
+        options:
+            cache: false
+
     build:
         command: "go build -o bin/ ./..."
         inputs:
@@ -77,6 +83,10 @@ tasks:
 
     test:
         command: "go test ./..."
+        args:
+            - "-race"
+            - "-count=1"
+            - "-coverprofile=coverage.out"
         inputs:
             - "@group(configs)"
             - "@group(sources)"
