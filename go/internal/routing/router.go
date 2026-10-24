@@ -13,6 +13,7 @@ import (
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/satchel/internal/telemetry"
 )
 
 const (
@@ -59,6 +60,8 @@ func newAPI(
 func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
+	router.Use(telemetry.HTTPMiddleware)
+	router.Use(traceRoute)
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(clientIP)

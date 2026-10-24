@@ -1,6 +1,7 @@
 package config
 
 import (
+	"maps"
 	"os"
 	"slices"
 	"strings"
@@ -29,6 +30,8 @@ func TestNewConfig(t *testing.T) {
 		t.Setenv("VERBOSE", "true")
 		t.Setenv("PORT", "8080")
 		t.Setenv("TELEMETRY_SENTRY_DSN", "https://test@example.com/1")
+		t.Setenv("TELEMETRY_OTLP_ENDPOINT", "http://localhost:4317")
+		t.Setenv("TELEMETRY_OTLP_HEADERS", "signoz-ingestion-key=secret,x-tenant=acme")
 
 		cfg, err := New()
 		if err != nil {
@@ -86,6 +89,22 @@ func TestNewConfig(t *testing.T) {
 				"https://test@example.com/1",
 			)
 		}
+
+		if cfg.Telemetry.OTLPEndpoint != "http://localhost:4317" {
+			t.Fatalf(
+				"got OTLP endpoint %q, want %q",
+				cfg.Telemetry.OTLPEndpoint,
+				"http://localhost:4317",
+			)
+		}
+
+		expectedOTLPHeaders := map[string]string{
+			"signoz-ingestion-key": "secret",
+			"x-tenant":             "acme",
+		}
+		if !maps.Equal(cfg.Telemetry.OTLPHeaders, expectedOTLPHeaders) {
+			t.Fatalf("got headers %v, want %v", cfg.Telemetry.OTLPHeaders, expectedOTLPHeaders)
+		}
 	})
 
 	t.Run("the telemetry DSN is optional", func(t *testing.T) {
@@ -99,6 +118,25 @@ func TestNewConfig(t *testing.T) {
 
 		if cfg.Telemetry.SentryDSN != "" {
 			t.Fatalf("got sentry DSN %q, want none", cfg.Telemetry.SentryDSN)
+		}
+	})
+
+	t.Run("the OTLP settings are optional", func(t *testing.T) {
+		setRequiredEnv(t)
+		t.Setenv("TELEMETRY_OTLP_ENDPOINT", "")
+		t.Setenv("TELEMETRY_OTLP_HEADERS", "")
+
+		cfg, err := New()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if cfg.Telemetry.OTLPEndpoint != "" {
+			t.Fatalf("got endpoint %q, want none", cfg.Telemetry.OTLPEndpoint)
+		}
+
+		if cfg.Telemetry.OTLPHeaders != nil {
+			t.Fatalf("got headers %v, want none", cfg.Telemetry.OTLPHeaders)
 		}
 	})
 

@@ -6,15 +6,40 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
+	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/bugtracker"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
 	globalRateLimit = 120
 	rateLimitWindow = time.Minute
 )
+
+// traceRoute names the span after the matched route once chi has routed the request.
+func traceRoute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		next.ServeHTTP(writer, request)
+
+		span := trace.SpanFromContext(request.Context())
+		if !span.IsRecording() {
+			return
+		}
+
+		route := chi.RouteContext(request.Context()).RoutePattern()
+		if route == "" {
+			span.SetName("http.server")
+
+			return
+		}
+
+		span.SetName(request.Method + " " + route)
+		span.SetAttributes(semconv.HTTPRoute(route))
+	})
+}
 
 func recoverer(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

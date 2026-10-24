@@ -18,6 +18,7 @@ import (
 	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
+	"github.com/sharktype/satchel/internal/telemetry"
 	"go.uber.org/zap"
 )
 
@@ -51,6 +52,23 @@ func run() (err error) {
 		return fmt.Errorf("error creating logger: %w", err)
 	}
 	defer shutdownLogger()
+
+	deploymentEnvironment := "development"
+	if cfg.Production {
+		deploymentEnvironment = "production"
+	}
+
+	shutdownTelemetry, err := telemetry.Init(context.Background(), telemetry.Config{
+		ServiceName:    cfg.API.Title,
+		ServiceVersion: cfg.API.Version,
+		Environment:    deploymentEnvironment,
+		Endpoint:       cfg.Telemetry.OTLPEndpoint,
+		Headers:        cfg.Telemetry.OTLPHeaders,
+	})
+	if err != nil {
+		return fmt.Errorf("error creating telemetry: %w", err)
+	}
+	defer shutdownTelemetry()
 
 	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN, cfg.Production)
 	if err != nil {

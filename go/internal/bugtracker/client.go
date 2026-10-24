@@ -30,6 +30,7 @@ func Init(dsn string, isProduction bool) (shutdown func(), err error) {
 
 	err = sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
+		EnableTracing:    true,
 		TracesSampleRate: traceSampleRate,
 		BeforeSend:       addSourceContext,
 	})

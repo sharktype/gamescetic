@@ -43,5 +43,7 @@ type API struct {
 }
 
 type Telemetry struct {
-	SentryDSN string `env:"SENTRY_DSN" envDefault:""`
+	SentryDSN    string            `env:"SENTRY_DSN" envDefault:""`
+	OTLPEndpoint string            `env:"OTLP_ENDPOINT" envDefault:""`
+	OTLPHeaders  map[string]string `env:"OTLP_HEADERS" envKeyValSeparator:"="`
 }
