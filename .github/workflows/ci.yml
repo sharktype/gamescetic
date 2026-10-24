@@ -11,6 +11,20 @@ concurrency:
 permissions:
     contents: read
 
+#
+# Before deployment, you must:
+#
+# 1. Deploy your Railway service as pointing to the image.
+# 2. Add the RAILWAY_TOKEN secret to your repository.
+# 3. Make sure environment variables are set correctly at the Railway side.
+#
+# Note that if you're not forking and just using the image, you can just rely on automatic updates.
+# You don't need to fork the repository or mess around with any of this.
+#
+
+env:
+    RAILWAY_SERVICE: satchel
+
 jobs:
     test-go:
         runs-on: ubuntu-24.04
@@ -103,5 +117,18 @@ jobs:
                   password: ${{ secrets.GITHUB_TOKEN }}
             - name: build and push image
               run: |
-                  docker build --tag "ghcr.io/${{ github.repository }}:latest" go
-                  docker push "ghcr.io/${{ github.repository }}:latest"
+                  docker build --tag "ghcr.io/${{ github.repository }}-go:latest" go
+                  docker push "ghcr.io/${{ github.repository }}-go:latest"
+
+    deploy-go:
+        needs: [publish-go]
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-24.04
+        steps:
+            - uses: actions/checkout@v7
+            - uses: moonrepo/setup-toolchain@v0
+            - run: npm i -g @railway/cli
+            - name: redeploy from image source
+              env:
+                  RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+              run: railway redeploy --yes --from-source --service "$RAILWAY_SERVICE"
