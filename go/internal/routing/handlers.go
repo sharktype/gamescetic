@@ -7,6 +7,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
+	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/health"
 	"go.uber.org/zap"
@@ -55,8 +56,6 @@ func register[I, O any](
 	operation huma.Operation,
 	callback func(context.Context, *I) (*O, error),
 ) {
-	// TODO: Report these to a bug tracker (Sentry or similar).
-
 	huma.Register(api, operation, func(ctx context.Context, input *I) (*O, error) {
 		result, err := callback(ctx, input)
 		if err == nil {
@@ -72,6 +71,8 @@ func register[I, O any](
 				zap.String("operation", operation.OperationID),
 				zap.Error(err),
 			)
+
+			bugtracker.Notify(err)
 
 			return result, err
 		}
@@ -91,6 +92,8 @@ func register[I, O any](
 			zap.Int("status", statusErr.GetStatus()),
 			zap.Error(logErr),
 		)
+
+		bugtracker.Notify(logErr)
 
 		return result, err
 	})

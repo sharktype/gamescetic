@@ -4,15 +4,13 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
+	"github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
-const (
-	flushTimeout = 2 * time.Second
-	sampleRate   = 0.1
-)
+const flushTimeout = 2 * time.Second
 
-func Init(logger *zap.Logger, dsn string) (shutdown func()) {
+func Init(dsn string) (shutdown func()) {
 	if dsn == "" {
 		logger.Info("no DSN provided, skipping bugtracker")
 
@@ -21,7 +19,7 @@ func Init(logger *zap.Logger, dsn string) (shutdown func()) {
 
 	err := sentry.Init(sentry.ClientOptions{
 		Dsn:              dsn,
-		TracesSampleRate: sampleRate,
+		TracesSampleRate: 0.1,
 	})
 	if err != nil {
 		logger.Fatal("failed to initialize bugtracker", zap.Error(err))

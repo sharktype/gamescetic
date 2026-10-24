@@ -65,7 +65,7 @@ func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handle
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
 		Logger: zap.NewStdLog(logger),
 	}))
-	router.Use(middleware.Recoverer)
+	router.Use(recoverer())
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)
 	router.Use(middleware.GetHead)

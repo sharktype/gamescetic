@@ -37,9 +37,7 @@ func main() {
 	}
 }
 
-func run() error {
-	// Load config and logger:
-
+func run() (err error) {
 	cfg, err := config.New()
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
@@ -57,10 +55,18 @@ func run() error {
 	// Initialise bugtracker:
 
 	if cfg.Telemetry.SentryDSN != "" {
-		shutdownBugtracker := bugtracker.Init(logger, cfg.Telemetry.SentryDSN)
+		shutdownBugtracker := bugtracker.Init(cfg.Telemetry.SentryDSN)
 
 		defer shutdownBugtracker()
 	}
+
+	// We actually do want to capture startup errors in telemetry.
+
+	defer func() {
+		if err != nil {
+			bugtracker.Notify(err)
+		}
+	}()
 
 	// Initialise app clients:
 
