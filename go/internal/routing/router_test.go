@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"testing"
 
@@ -199,6 +198,21 @@ func TestNewRouter(t *testing.T) {
 		}
 	})
 
+	t.Run("the client address replaces the peer address", func(t *testing.T) {
+		router := testRouter(t)
+
+		var remoteAddr string
+		router.Get("/ip", func(_ http.ResponseWriter, r *http.Request) {
+			remoteAddr = r.RemoteAddr
+		})
+
+		getFrom(router, "/ip", "1.0.0.1")
+
+		if remoteAddr != "1.0.0.1" {
+			t.Fatalf("got %q, want %q", remoteAddr, "1.0.0.1")
+		}
+	})
+
 	t.Run("the global limiter covers ping", func(t *testing.T) {
 		router := testRouter(t)
 
@@ -222,29 +236,7 @@ func TestNewRouter(t *testing.T) {
 
 		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
 
-		request := func(forwardedFor string) int {
-			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
-			request.Header.Set("X-Forwarded-For", forwardedFor)
-
-			response := httptest.NewRecorder()
-			router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
-		for i := range globalRateLimit {
-			if code := request("1.0.0.1"); code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := request("1.0.0.1"); code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
-		}
-
-		if code := request("1.0.0.2"); code != http.StatusOK {
-			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
-		}
+		assertLimitedPerClient(t, router, "/ping", globalRateLimit)
 	})
 }
 
@@ -298,29 +290,11 @@ func TestRateLimit(t *testing.T) {
 		}
 	})
 
-	t.Run("an unparseable client address still shares a bucket", func(t *testing.T) {
+	t.Run("the operation limiter is per client behind the proxy", func(t *testing.T) {
 		api := newTestAPI(t)
 
 		authtest.RegisterProbe(api.public, nil)
 
-		request := func(i int) int {
-			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
-			request.RemoteAddr = "not-an-address-" + strconv.Itoa(i)
-
-			response := httptest.NewRecorder()
-			api.router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
-		for i := range publicRateLimit {
-			if code := request(i); code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := request(publicRateLimit); code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
-		}
+		assertLimitedPerClient(t, api.router, authtest.ProbePath, publicRateLimit)
 	})
 }

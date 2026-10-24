@@ -30,7 +30,7 @@ func newTestAPI(t *testing.T) testAPI {
 
 	authClient := authtest.New(t, dbtest.NewClosed(t))
 
-	router := chi.NewMux()
+	router := testRouter(t)
 	public, secured := newAPI(
 		router, huma.DefaultConfig("test", "0.0.0"), authClient.Client,
 	)
@@ -80,8 +80,73 @@ func get(router http.Handler, path, authorization string) *httptest.ResponseReco
 		request.Header.Set("Authorization", authorization)
 	}
 
+	return serve(router, request)
+}
+
+func getFrom(router http.Handler, path, forwardedFor string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.Header.Set("X-Forwarded-For", forwardedFor)
+
+	return serve(router, request)
+}
+
+func serve(router http.Handler, request *http.Request) *httptest.ResponseRecorder {
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 
 	return response
+}
+
+// assertLimitedPerClient asserts rate limits are enforced in tests.
+//
+// It exhausts one client's limit on path, then checks that the bucket follows the trusted client
+// address rather than anything the client can forge.
+func assertLimitedPerClient(t *testing.T, router http.Handler, path string, limit int) {
+	t.Helper()
+
+	clients := []struct {
+		exhausted  string
+		sameBucket string
+		other      string
+	}{
+		{exhausted: "1.0.0.1", sameBucket: "1.0.0.1", other: "1.0.0.2"},
+		{exhausted: "2001:db8::1", sameBucket: "2001:db8::2", other: "2001:db8:0:1::1"},
+	}
+
+	for _, client := range clients {
+		for i := range limit {
+			if code := getFrom(
+				router, path, client.exhausted,
+			).Code; code != http.StatusOK {
+				t.Fatalf(
+					"%s request %d: got %d, want %d", client.exhausted, i+1, code, http.StatusOK,
+				)
+			}
+		}
+
+		if code := getFrom(
+			router, path, client.sameBucket,
+		).Code; code != http.StatusTooManyRequests {
+			t.Fatalf(
+				"%s escaped the limit of %s: got %d, want %d",
+				client.sameBucket, client.exhausted, code, http.StatusTooManyRequests,
+			)
+		}
+
+		if code := getFrom(
+			router, path, "9.9.9.9, "+client.exhausted,
+		).Code; code != http.StatusTooManyRequests {
+			t.Fatalf(
+				"a forged leftmost hop escaped the limit of %s: got %d, want %d",
+				client.exhausted, code, http.StatusTooManyRequests,
+			)
+		}
+
+		if code := getFrom(router, path, client.other).Code; code != http.StatusOK {
+			t.Fatalf(
+				"%s was throttled by %s: got %d, want %d",
+				client.other, client.exhausted, code, http.StatusOK,
+			)
+		}
+	}
 }

@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/lestrrat-go/jwx/v3/jwa"
-	"github.com/lestrrat-go/jwx/v3/jwk"
-	"github.com/lestrrat-go/jwx/v3/jwt"
+	"github.com/lestrrat-go/jwx/v4/jwa"
+	"github.com/lestrrat-go/jwx/v4/jwk"
+	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
 	"go.uber.org/zap"
@@ -39,7 +39,7 @@ func NewSigner(t testing.TB) *Signer {
 		t.Fatal(err)
 	}
 
-	key, err := jwk.Import(privateKey)
+	key, err := jwk.Import[jwk.Key](privateKey)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,10 +101,21 @@ func (s *Signer) publicJWKS(t testing.TB) []byte {
 func (s *Signer) Token(t testing.TB, sub string) string {
 	t.Helper()
 
-	return s.TokenWithScopes(t, sub, nil)
+	return s.TokenWithClaims(t, sub, nil)
 }
 
 func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) string {
+	t.Helper()
+
+	var claims map[string]any
+	if scopes != nil {
+		claims = map[string]any{"scope": strings.Join(scopes, " ")}
+	}
+
+	return s.TokenWithClaims(t, sub, claims)
+}
+
+func (s *Signer) TokenWithClaims(t testing.TB, sub string, claims map[string]any) string {
 	t.Helper()
 
 	token := jwt.New()
@@ -125,8 +136,8 @@ func (s *Signer) TokenWithScopes(t testing.TB, sub string, scopes []string) stri
 		t.Fatal(err)
 	}
 
-	if scopes != nil {
-		if err := token.Set("scope", strings.Join(scopes, " ")); err != nil {
+	for name, value := range claims {
+		if err := token.Set(name, value); err != nil {
 			t.Fatal(err)
 		}
 	}

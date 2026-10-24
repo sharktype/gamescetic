@@ -21,9 +21,11 @@ fileGroups:
 
 tasks:
     install:
-        command: "go mod download && go mod tidy"
+        script: "go mod download && go mod tidy"
         inputs:
             - "@group(configs)"
+        options:
+            cache: false
 
     build:
         command: "go build -o bin/ ./..."

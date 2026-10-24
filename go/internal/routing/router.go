@@ -59,18 +59,11 @@ func newAPI(
 func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
-	// Assumption: API sits behind a proxy e.g. Cloudflare that sets forwarding headers and is not
-	// directly reachable. Otherwise, RealIP would trust the given client-controlled IP address.
-	//
-	// This is fine for self-hosted configurations most of the time since either the API would be
-	// deployed via a reverse proxy with TLS, or the API is only used by trusted clients.
-
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
-	router.Use(middleware.RealIP)
+	router.Use(clientIP)
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
-		Logger:  zap.NewStdLog(logger),
-		NoColor: true,
+		Logger: zap.NewStdLog(logger),
 	}))
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.StripSlashes)
