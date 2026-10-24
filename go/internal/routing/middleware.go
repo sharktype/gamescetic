@@ -10,7 +10,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
 	"github.com/sharktype/satchel/internal/bugtracker"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -19,25 +20,28 @@ const (
 	rateLimitWindow = time.Minute
 )
 
-// traceRoute names the span after the matched route once chi has routed the request.
+// traceRoute records the matched route on the request's span and metrics.
+//
+// otelhttp can name spans from http.Request.Pattern, but middleware.RequestID replaces the request
+// before chi sets it, so otelhttp never sees the pattern here. chi's RouteContext lives in the
+// original context and is mutated in place, so it is still readable after the handler returns.
 func traceRoute(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		next.ServeHTTP(writer, request)
 
-		span := trace.SpanFromContext(request.Context())
-		if !span.IsRecording() {
-			return
-		}
-
 		route := chi.RouteContext(request.Context()).RoutePattern()
 		if route == "" {
-			span.SetName("http.server")
-
 			return
 		}
 
+		span := trace.SpanFromContext(request.Context())
 		span.SetName(request.Method + " " + route)
 		span.SetAttributes(semconv.HTTPRoute(route))
+
+		// otelhttp labels metrics after the handler returns, once the route is known.
+		if labeler, ok := otelhttp.LabelerFromContext(request.Context()); ok {
+			labeler.Add(semconv.HTTPRoute(route))
+		}
 	})
 }
 

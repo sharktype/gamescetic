@@ -21,6 +21,7 @@ const (
 	publicRateLimit  = 30
 	securedRateLimit = 60
 	compressionLevel = 5
+	heartbeatPath    = "/ping"
 )
 
 // newAPI returns the groups on which every operation must be registered as a n-ary tuple.
@@ -60,7 +61,7 @@ func newAPI(
 func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
-	router.Use(telemetry.HTTPMiddleware)
+	router.Use(telemetry.HTTPMiddleware(heartbeatPath))
 	router.Use(traceRoute)
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
@@ -79,7 +80,7 @@ func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	// Counts per replica so remember to keep volumetric throttling at the edge too.
 
 	router.Use(rateLimitGlobally)
-	router.Use(middleware.Heartbeat("/ping"))
+	router.Use(middleware.Heartbeat(heartbeatPath))
 
 	return router
 }

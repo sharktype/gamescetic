@@ -30,17 +30,9 @@ func TestInit(t *testing.T) {
 }
 
 func TestHTTPMiddleware(t *testing.T) {
-	recorder := tracetest.NewSpanRecorder()
-	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
-	previous := otel.GetTracerProvider()
-	otel.SetTracerProvider(provider)
+	recorder := newSpanRecorder(t)
 
-	t.Cleanup(func() {
-		otel.SetTracerProvider(previous)
-		_ = provider.Shutdown(context.Background())
-	})
-
-	handler := HTTPMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := HTTPMiddleware()(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
 
@@ -65,4 +57,34 @@ func TestHTTPMiddleware(t *testing.T) {
 	if path != "/items/42" {
 		t.Fatalf("got path %q, want %q", path, "/items/42")
 	}
+}
+
+func TestHTTPMiddlewareSkipsPaths(t *testing.T) {
+	recorder := newSpanRecorder(t)
+
+	handler := HTTPMiddleware("/ping")(
+		http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
+	)
+
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/ping", nil))
+
+	if spans := recorder.Ended(); len(spans) != 0 {
+		t.Fatalf("got %d spans, want none", len(spans))
+	}
+}
+
+func newSpanRecorder(t *testing.T) *tracetest.SpanRecorder {
+	t.Helper()
+
+	recorder := tracetest.NewSpanRecorder()
+	provider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	previous := otel.GetTracerProvider()
+	otel.SetTracerProvider(provider)
+
+	t.Cleanup(func() {
+		otel.SetTracerProvider(previous)
+		_ = provider.Shutdown(context.Background())
+	})
+
+	return recorder
 }

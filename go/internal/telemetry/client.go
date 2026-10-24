@@ -2,10 +2,10 @@ package telemetry
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"time"
 
 	"github.com/sharktype/satchel/internal/logger"
@@ -17,14 +17,13 @@ import (
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"go.uber.org/zap"
 )
 
 const (
-	exportTimeout    = 5 * time.Second
-	metricInterval   = 30 * time.Second
-	traceSampleRatio = 1.0
+	exportTimeout  = 5 * time.Second
+	metricInterval = 30 * time.Second
 )
 
 func Init(ctx context.Context, cfg Config) (shutdown func(), err error) {
@@ -42,6 +41,8 @@ func Init(ctx context.Context, cfg Config) (shutdown func(), err error) {
 		ctx,
 		resource.WithFromEnv(),
 		resource.WithTelemetrySDK(),
+		resource.WithHost(),
+		resource.WithProcess(),
 		resource.WithAttributes(
 			semconv.ServiceName(cfg.ServiceName),
 			semconv.ServiceVersion(cfg.ServiceVersion),
@@ -67,13 +68,14 @@ func Init(ctx context.Context, cfg Config) (shutdown func(), err error) {
 		otlpmetricgrpc.WithHeaders(cfg.Headers),
 	)
 	if err != nil {
+		_ = traceExporter.Shutdown(ctx)
+
 		return nil, fmt.Errorf("failed to create metric exporter: %w", err)
 	}
 
 	tracerProvider := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(newSampler(traceSampleRatio)),
 	)
 	meterProvider := metric.NewMeterProvider(
 		metric.WithReader(metric.NewPeriodicReader(
@@ -93,38 +95,35 @@ func Init(ctx context.Context, cfg Config) (shutdown func(), err error) {
 		logger.Warn("telemetry export failed", zap.Error(err))
 	}))
 
-	logger.Info(
-		"opentelemetry initialized",
-		zap.String("endpoint", cfg.Endpoint),
-		zap.Float64("sample_ratio", traceSampleRatio),
-	)
+	logger.Info("opentelemetry initialized", zap.String("endpoint", cfg.Endpoint))
 
 	return func() {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), exportTimeout)
-		defer cancel()
+		shutdown := func(name string, stop func(context.Context) error) {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), exportTimeout)
+			defer cancel()
 
-		if err := errors.Join(
-			tracerProvider.Shutdown(shutdownCtx),
-			meterProvider.Shutdown(shutdownCtx),
-		); err != nil {
-			logger.Warn("failed to shut down telemetry", zap.Error(err))
+			if err := stop(shutdownCtx); err != nil {
+				logger.Warn(
+					"failed to shut down telemetry",
+					zap.String("provider", name),
+					zap.Error(err),
+				)
+			}
 		}
+
+		shutdown("tracing", tracerProvider.Shutdown)
+		shutdown("metrics", meterProvider.Shutdown)
 	}, nil
 }
 
-func HTTPMiddleware(next http.Handler) http.Handler {
-	return otelhttp.NewHandler(next, "http.server")
-}
-
-func newSampler(ratio float64) sdktrace.Sampler {
-	switch {
-	case ratio >= 1:
-		return sdktrace.AlwaysSample()
-	case ratio <= 0:
-		return sdktrace.NeverSample()
-	default:
-		return sdktrace.ParentBased(sdktrace.TraceIDRatioBased(ratio))
-	}
+// HTTPMiddleware instruments requests with spans and metrics, skipping requests in skipPaths.
+func HTTPMiddleware(skipPaths ...string) func(http.Handler) http.Handler {
+	return otelhttp.NewMiddleware(
+		"http.server",
+		otelhttp.WithFilter(func(request *http.Request) bool {
+			return !slices.Contains(skipPaths, request.URL.Path)
+		}),
+	)
 }
 
 func validateEndpoint(endpoint string) error {
