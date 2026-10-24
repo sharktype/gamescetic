@@ -6,7 +6,6 @@ import (
 
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
 )
 
 type Clients struct {
@@ -14,17 +13,15 @@ type Clients struct {
 	Auth *auth.Client
 }
 
-func New(
-	ctx context.Context, logger *zap.Logger, dbCfg db.Config, authCfg auth.Config,
-) (*Clients, error) {
-	pool, err := db.NewPool(ctx, logger, dbCfg)
+func New(ctx context.Context, dbCfg db.Config, authCfg auth.Config) (*Clients, error) {
+	pool, err := db.NewPool(ctx, dbCfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create database client: %w", err)
 	}
 
 	database := db.New(pool)
 
-	authClient, err := auth.New(ctx, database, logger, authCfg)
+	authClient, err := auth.New(ctx, database, authCfg)
 	if err != nil {
 		database.Close()
 

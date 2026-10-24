@@ -1,16 +1,17 @@
 package config
 
 type Config struct {
-	Auth    Auth    `envPrefix:"AUTH_"`
-	Clients Clients `envPrefix:"CLIENTS_"`
-	CORS    CORS    `envPrefix:"CORS_"`
-	API     API     `envPrefix:"API_"`
+	// Production is a special flag variable always resolved directly from the real env.
+	Production bool `env:"-"`
+
+	Auth      Auth      `envPrefix:"AUTH_"`
+	Clients   Clients   `envPrefix:"CLIENTS_"`
+	CORS      CORS      `envPrefix:"CORS_"`
+	API       API       `envPrefix:"API_"`
+	Telemetry Telemetry `envPrefix:"TELEMETRY_"`
 
 	Port    int  `env:"PORT" envDefault:"9500"`
 	Verbose bool `env:"VERBOSE" envDefault:"false"`
-
-	// Production is a special flag variable always resolved directly from the real env.
-	Production bool `env:"-"`
 }
 
 type Auth struct {
@@ -39,4 +40,8 @@ type CORS struct {
 type API struct {
 	Title   string `env:"TITLE" envDefault:"satchel-api"`
 	Version string `env:"VERSION" envDefault:"0.1.0"`
+}
+
+type Telemetry struct {
+	SentryDSN string `env:"SENTRY_DSN" envDefault:""`
 }

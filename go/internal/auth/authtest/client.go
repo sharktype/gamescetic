@@ -16,7 +16,6 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwt"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/db"
-	"go.uber.org/zap"
 )
 
 // Client verifies tokens from a throwaway IDP.
@@ -67,7 +66,6 @@ func New(t testing.TB, db *db.Store) *Client {
 	authClient, err := auth.New(
 		t.Context(),
 		db,
-		zap.NewNop(),
 		auth.Config{JWKSURL: server.URL, Issuer: signer.issuer, Audience: signer.audience},
 	)
 	if err != nil {

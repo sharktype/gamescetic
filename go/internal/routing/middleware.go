@@ -8,12 +8,40 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
+	"github.com/sharktype/satchel/internal/bugtracker"
 )
 
 const (
 	globalRateLimit = 120
 	rateLimitWindow = time.Minute
 )
+
+func recoverer(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		defer func() {
+			recovered := recover()
+			if recovered == nil {
+				return
+			}
+
+			if recovered == http.ErrAbortHandler {
+				panic(recovered)
+			}
+
+			bugtracker.PanicRequest(
+				request,
+				middleware.GetReqID(request.Context()),
+				recovered,
+			)
+
+			if request.Header.Get("Connection") != "Upgrade" {
+				writer.WriteHeader(http.StatusInternalServerError)
+			}
+		}()
+
+		next.ServeHTTP(writer, request)
+	})
+}
 
 // rateLimitGlobally throttles every request from one client IP.
 //

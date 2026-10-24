@@ -47,6 +47,8 @@ func testRouter(t *testing.T) *chi.Mux {
 func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 	t.Helper()
 
+	useLogger(t, logger)
+
 	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins: []string{"http://example.com"},
 	})
@@ -54,7 +56,16 @@ func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 		t.Fatal(err)
 	}
 
-	return NewRouter(logger, corsHandler)
+	return NewRouter(corsHandler)
+}
+
+func useLogger(t *testing.T, logger *zap.Logger) {
+	t.Helper()
+
+	previous := zap.L()
+	zap.ReplaceGlobals(logger)
+
+	t.Cleanup(func() { zap.ReplaceGlobals(previous) })
 }
 
 func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest.Signer) {
@@ -64,7 +75,6 @@ func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest
 	authClient := authtest.New(t, database)
 
 	Handle(
-		zap.NewNop(),
 		router,
 		&clients.Clients{DB: database, Auth: authClient.Client},
 		huma.DefaultConfig("test", "1"),
@@ -97,10 +107,6 @@ func serve(router http.Handler, request *http.Request) *httptest.ResponseRecorde
 	return response
 }
 
-// assertLimitedPerClient asserts rate limits are enforced in tests.
-//
-// It exhausts one client's limit on path, then checks that the bucket follows the trusted client
-// address rather than anything the client can forge.
 func assertLimitedPerClient(t *testing.T, router http.Handler, path string, limit int) {
 	t.Helper()
 

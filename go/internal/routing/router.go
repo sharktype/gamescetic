@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
-	"go.uber.org/zap"
+	"github.com/sharktype/satchel/internal/logger"
 )
 
 const (
@@ -56,16 +56,16 @@ func newAPI(
 // Every request passes through this router including ones huma/the API never sees such as /ping.
 //
 // Middleware here apply to _all_ traffic, and middleware in the API groups are layered on top.
-func NewRouter(logger *zap.Logger, corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
+func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router := chi.NewMux()
 
 	router.Use(httpx.SecurityHeaders())
 	router.Use(middleware.RequestID)
 	router.Use(clientIP)
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
-		Logger: zap.NewStdLog(logger),
+		Logger: logger.StdLogger(),
 	}))
-	router.Use(middleware.Recoverer)
+	router.Use(recoverer)
 	router.Use(middleware.StripSlashes)
 	router.Use(middleware.CleanPath)
 	router.Use(middleware.GetHead)

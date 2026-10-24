@@ -11,25 +11,24 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/sharktype/satchel/internal/auth"
+	"github.com/sharktype/satchel/internal/bugtracker"
 	"github.com/sharktype/satchel/internal/clients"
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
-	appLogger "github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
 	"go.uber.org/zap"
 )
 
-const readHeaderTimeout = 5 * time.Second
-const readTimeout = 30 * time.Second
-const idleTimeout = 120 * time.Second
-
-// These have to outlast the router's middleware.Timeout so responses are fully written and
-// in-flight requests are drained before the server gives up.
-
-const graceMargin = 10 * time.Second
-const writeTimeout = routing.RequestTimeout + graceMargin
-const shutdownTimeout = routing.RequestTimeout + graceMargin
+const (
+	readHeaderTimeout = 5 * time.Second
+	readTimeout       = 30 * time.Second
+	idleTimeout       = 120 * time.Second
+	graceMargin       = 10 * time.Second
+	writeTimeout      = routing.RequestTimeout + graceMargin
+	shutdownTimeout   = routing.RequestTimeout + graceMargin
+)
 
 func main() {
 	if err := run(); err != nil {
@@ -38,24 +37,34 @@ func main() {
 	}
 }
 
-func run() error {
-	// Load config and logger:
-
+func run() (err error) {
 	cfg, err := config.New()
 	if err != nil {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	logger, err := appLogger.New(appLogger.Config{
+	shutdownLogger, err := logger.Init(logger.Config{
 		Production: cfg.Production,
 		Verbose:    cfg.Verbose,
 	})
 	if err != nil {
 		return fmt.Errorf("error creating logger: %w", err)
 	}
-	defer func() { _ = logger.Sync() }()
+	defer shutdownLogger()
 
-	// Initialise app clients:
+	shutdownBugtracker, err := bugtracker.Init(cfg.Telemetry.SentryDSN, cfg.Production)
+	if err != nil {
+		return fmt.Errorf("error creating bugtracker: %w", err)
+	}
+	defer shutdownBugtracker()
+
+	// We actually do want to capture startup errors in telemetry.
+
+	defer func() {
+		if err != nil {
+			bugtracker.ReportError("app run failed", err)
+		}
+	}()
 
 	if cfg.Production {
 		logger.Info("app booting in production mode...")
@@ -65,7 +74,6 @@ func run() error {
 
 	appClients, err := clients.New(
 		context.Background(),
-		logger,
 		db.Config{DSN: cfg.Clients.DB.DSN},
 		auth.Config{
 			JWKSURL:  cfg.Auth.JWKSURL,
@@ -77,8 +85,6 @@ func run() error {
 		return fmt.Errorf("error creating clients: %w", err)
 	}
 	defer appClients.Close()
-
-	// Initialise router:
 
 	corsHandler, err := httpx.NewCORSHandler(httpx.CORSConfig{
 		AllowedOrigins:   cfg.CORS.AllowedOrigins,
@@ -92,16 +98,13 @@ func run() error {
 		return err
 	}
 
-	router := routing.NewRouter(logger, corsHandler)
+	router := routing.NewRouter(corsHandler)
 
 	routing.Handle(
-		logger,
 		router,
 		appClients,
 		huma.DefaultConfig(cfg.API.Title, cfg.API.Version),
 	)
-
-	// Initialise server:
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", cfg.Port),
@@ -122,7 +125,7 @@ func run() error {
 	defer stop()
 
 	// ListenAndServe blocks until the server stops, so it runs in the background and reports why
-	// it stopped on serveErr.
+	// it stopped on receiving at serveErr.
 
 	serveErr := make(chan error, 1)
 
@@ -132,7 +135,7 @@ func run() error {
 	}()
 
 	select {
-	case err := <-serveErr:
+	case err = <-serveErr:
 		return fmt.Errorf("server stopped unexpectedly: %w", err)
 	case <-signalCtx.Done():
 	}

@@ -76,7 +76,9 @@ func TestHandle(t *testing.T) {
 
 		api := newTestAPI(t)
 
-		register(logger, api.public, huma.Operation{
+		useLogger(t, logger)
+
+		register(api.public, huma.Operation{
 			OperationID: "GetWrappedError",
 			Method:      http.MethodGet,
 			Path:        "/wrapped-error",
@@ -96,9 +98,16 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "connection refused",
-		) {
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetWrappedError" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetWrappedError")
+		}
+
+		if fields["status"] != int64(http.StatusServiceUnavailable) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusServiceUnavailable)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, "connection refused") {
 			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
@@ -109,7 +118,9 @@ func TestHandle(t *testing.T) {
 
 		api := newTestAPI(t)
 
-		register(logger, api.public, huma.Operation{
+		useLogger(t, logger)
+
+		register(api.public, huma.Operation{
 			OperationID: "GetPlainError",
 			Method:      http.MethodGet,
 			Path:        "/plain-error",
@@ -127,9 +138,16 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, "intentional failure",
-		) {
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetPlainError" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetPlainError")
+		}
+
+		if fields["status"] != int64(http.StatusInternalServerError) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusInternalServerError)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, "intentional failure") {
 			t.Fatalf("the log entry lost the error: %q", logged)
 		}
 	})
@@ -213,7 +231,6 @@ func TestHandle(t *testing.T) {
 		authClient := authtest.New(t, dbtest.Provision(t))
 
 		Handle(
-			logger,
 			router,
 			&clients.Clients{DB: unavailable, Auth: authClient.Client},
 			huma.DefaultConfig("test", "1"),
@@ -235,9 +252,16 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d matching log entries, want 1", len(entries))
 		}
 
-		if logged, _ := entries[0].ContextMap()["error"].(string); !strings.Contains(
-			logged, cause.Error(),
-		) {
+		fields := entries[0].ContextMap()
+		if fields["operation"] != "GetDatabaseHealth" {
+			t.Fatalf("got operation %v, want %q", fields["operation"], "GetDatabaseHealth")
+		}
+
+		if fields["status"] != int64(http.StatusServiceUnavailable) {
+			t.Fatalf("got status %v, want %d", fields["status"], http.StatusServiceUnavailable)
+		}
+
+		if logged, _ := fields["error"].(string); !strings.Contains(logged, cause.Error()) {
 			t.Fatalf("the log entry lost the cause: %q", logged)
 		}
 	})
