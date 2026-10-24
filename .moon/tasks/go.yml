@@ -29,7 +29,6 @@ tasks:
 
     install-tools:
         script: "go install -C ./tools tool"
-        preset: "utility"
         options:
             cache: false
 
