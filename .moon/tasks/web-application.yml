@@ -4,7 +4,19 @@ inheritedBy:
     stack: "frontend"
     layer: "application"
 
+fileGroups:
+    workspace:
+        - "package.json"
+        - "libs/*/package.json"
+        - "pnpm-lock.yaml"
+        - "pnpm-workspace.yaml"
+
 tasks:
+    install:
+        command: "pnpm install"
+        inputs:
+            - "@group(workspace)"
+
     build:
         command: "pnpm run build"
         inputs:
