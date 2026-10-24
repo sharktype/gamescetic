@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http"
-	"net/http/httptest"
 	"strconv"
 	"testing"
 
@@ -207,10 +206,7 @@ func TestNewRouter(t *testing.T) {
 			remoteAddr = r.RemoteAddr
 		})
 
-		request := httptest.NewRequest(http.MethodGet, "/ip", nil)
-		request.Header.Set("X-Forwarded-For", "1.0.0.1")
-
-		router.ServeHTTP(httptest.NewRecorder(), request)
+		getFrom(router, "/ip", "1.0.0.1")
 
 		if remoteAddr != "1.0.0.1" {
 			t.Fatalf("got %q, want %q", remoteAddr, "1.0.0.1")
@@ -240,31 +236,21 @@ func TestNewRouter(t *testing.T) {
 
 		router.Get("/noop", func(http.ResponseWriter, *http.Request) {})
 
-		request := func(forwardedFor string) int {
-			request := httptest.NewRequest(http.MethodGet, "/ping", nil)
-			request.Header.Set("X-Forwarded-For", forwardedFor)
-
-			response := httptest.NewRecorder()
-			router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
 		for i := range globalRateLimit {
-			if code := request("1.0.0.1"); code != http.StatusOK {
+			if code := getFrom(router, "/ping", "1.0.0.1").Code; code != http.StatusOK {
 				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
 			}
 		}
 
-		if code := request("1.0.0.1"); code != http.StatusTooManyRequests {
+		if code := getFrom(router, "/ping", "1.0.0.1").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		if code := request("9.9.9.9, 1.0.0.1"); code != http.StatusTooManyRequests {
+		if code := getFrom(router, "/ping", "9.9.9.9, 1.0.0.1").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		if code := request("1.0.0.2"); code != http.StatusOK {
+		if code := getFrom(router, "/ping", "1.0.0.2").Code; code != http.StatusOK {
 			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
 		}
 	})
@@ -325,27 +311,17 @@ func TestRateLimit(t *testing.T) {
 
 		authtest.RegisterProbe(api.public, nil)
 
-		request := func(forwardedFor string) int {
-			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
-			request.Header.Set("X-Forwarded-For", forwardedFor)
-
-			response := httptest.NewRecorder()
-			api.router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
 		for i := range publicRateLimit {
-			if code := request("1.0.0.1"); code != http.StatusOK {
+			if code := getFrom(api.router, authtest.ProbePath, "1.0.0.1").Code; code != http.StatusOK {
 				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
 			}
 		}
 
-		if code := request("9.9.9.9, 1.0.0.1"); code != http.StatusTooManyRequests {
+		if code := getFrom(api.router, authtest.ProbePath, "9.9.9.9, 1.0.0.1").Code; code != http.StatusTooManyRequests {
 			t.Fatalf("a forged leftmost hop escaped the limit: got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		if code := request("1.0.0.2"); code != http.StatusOK {
+		if code := getFrom(api.router, authtest.ProbePath, "1.0.0.2").Code; code != http.StatusOK {
 			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
 		}
 	})

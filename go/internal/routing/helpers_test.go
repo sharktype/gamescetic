@@ -85,3 +85,13 @@ func get(router http.Handler, path, authorization string) *httptest.ResponseReco
 
 	return response
 }
+
+func getFrom(router http.Handler, path, forwardedFor string) *httptest.ResponseRecorder {
+	request := httptest.NewRequest(http.MethodGet, path, nil)
+	request.Header.Set("X-Forwarded-For", forwardedFor)
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	return response
+}
