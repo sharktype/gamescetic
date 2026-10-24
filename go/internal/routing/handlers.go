@@ -41,7 +41,7 @@ func Handle(
 		Path:        "/health/auth",
 	}, health.GetAuthHealth)
 
-	register(secured, huma.Operation{
+	register(public, huma.Operation{
 		OperationID: "GetErrorHealth",
 		Summary:     "Get Error Health",
 		Method:      http.MethodGet,

@@ -153,11 +153,9 @@ func TestHandle(t *testing.T) {
 	})
 
 	t.Run("a handler returning no output still reports its status", func(t *testing.T) {
-		router, signer := newHandledRouter(t, dbtest.Provision(t))
+		router, _ := newHandledRouter(t, dbtest.NewClosed(t))
 
-		code := get(
-			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
-		).Code
+		code := get(router, "/health/error", "").Code
 		if code != http.StatusInternalServerError {
 			t.Fatalf("got %d, want %d", code, http.StatusInternalServerError)
 		}
@@ -171,7 +169,7 @@ func TestHandle(t *testing.T) {
 			)
 		}
 
-		router, signer := newHandledRouter(t, dbtest.Provision(t))
+		router, _ := newHandledRouter(t, dbtest.Provision(t))
 
 		for i := range publicRateLimit {
 			if code := get(router, "/health", "").Code; code != http.StatusOK {
@@ -183,9 +181,7 @@ func TestHandle(t *testing.T) {
 			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
 		}
 
-		code := get(
-			router, "/health/error", "Bearer "+signer.Token(t, dbtest.ProvisionedUser().Sub),
-		).Code
+		code := get(router, "/health/error", "").Code
 		if code == http.StatusTooManyRequests {
 			t.Fatal("exhausting /health also exhausted /health/error")
 		}
