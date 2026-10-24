@@ -325,30 +325,4 @@ func TestRateLimit(t *testing.T) {
 			t.Fatalf("a second client was throttled: got %d, want %d", code, http.StatusOK)
 		}
 	})
-
-	t.Run("an unparseable client address still shares a bucket", func(t *testing.T) {
-		api := newTestAPI(t)
-
-		authtest.RegisterProbe(api.public, nil)
-
-		request := func(i int) int {
-			request := httptest.NewRequest(http.MethodGet, authtest.ProbePath, nil)
-			request.RemoteAddr = "not-an-address-" + strconv.Itoa(i)
-
-			response := httptest.NewRecorder()
-			api.router.ServeHTTP(response, request)
-
-			return response.Code
-		}
-
-		for i := range publicRateLimit {
-			if code := request(i); code != http.StatusOK {
-				t.Fatalf("request %d: got %d, want %d", i+1, code, http.StatusOK)
-			}
-		}
-
-		if code := request(publicRateLimit); code != http.StatusTooManyRequests {
-			t.Fatalf("got %d, want %d", code, http.StatusTooManyRequests)
-		}
-	})
 }

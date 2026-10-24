@@ -1,7 +1,6 @@
 package routing
 
 import (
-	"net"
 	"net/http"
 	"time"
 
@@ -30,9 +29,6 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 		request, writer := humachi.Unwrap(ctx)
 
 		ip, _ := httprate.KeyByIP(request)
-		if net.ParseIP(ip) == nil {
-			ip = "unknown"
-		}
 
 		key := ip + " " + ctx.Operation().OperationID
 		if limiter.RespondOnLimit(writer, request, key) {
