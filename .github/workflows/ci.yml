@@ -13,7 +13,7 @@ permissions:
 
 jobs:
     test-go:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         services:
             postgres:
                 image: postgres:18
@@ -39,7 +39,7 @@ jobs:
               with:
                   auto-install: true
                   auto-setup: true
-            - uses: actions/cache@v4
+            - uses: actions/cache@v6
               with:
                   path: |
                       ~/.cache/go-build
@@ -63,7 +63,7 @@ jobs:
               run: go tool cover -func=coverage.out
 
     test-web:
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@v7
               with:
@@ -73,7 +73,7 @@ jobs:
               with:
                   auto-install: true
                   auto-setup: true
-            - uses: actions/cache@v4
+            - uses: actions/cache@v6
               with:
                   path: ~/.local/share/pnpm/store
                   key: ${{ runner.os }}-pnpm-${{ hashFiles('web/pnpm-lock.yaml') }}
@@ -90,7 +90,7 @@ jobs:
     publish-go:
         needs: [test-go]
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        runs-on: ubuntu-latest
+        runs-on: ubuntu-24.04
         permissions:
             contents: read
             packages: write
