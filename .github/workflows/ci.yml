@@ -65,6 +65,7 @@ jobs:
               with:
                   auto-install: true
                   auto-setup: true
+            - run: moon run web:install
             - run: moon run web:build
             - run: moon run web:lint-check
             - run: moon run web:format-check
