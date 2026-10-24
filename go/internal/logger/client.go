@@ -1,10 +1,10 @@
 package logger
 
 import (
+	"log"
+
 	"go.uber.org/zap"
 )
-
-var globalLogger = zap.NewNop()
 
 // Init installs the application logger globally and returns a disposal function.
 func Init(cfg Config) (shutdown func(), err error) {
@@ -25,37 +25,32 @@ func Init(cfg Config) (shutdown func(), err error) {
 		return nil, err
 	}
 
-	globalLogger = built
+	zap.ReplaceGlobals(built)
 
 	return func() { _ = built.Sync() }, nil
 }
 
-// Set installs an already-built logger.
-//
-// Tests use it to capture output. Don't use it in production logic.
-func Set(built *zap.Logger) {
-	globalLogger = built
-}
-
-// Global returns the global logger directly.
-func Global() *zap.Logger {
-	return globalLogger
-}
-
-// Re-export to simplify the logging API in the application:
-
 func Debug(msg string, fields ...zap.Field) {
-	globalLogger.Debug(msg, fields...)
+	appLog().Debug(msg, fields...)
 }
 
 func Info(msg string, fields ...zap.Field) {
-	globalLogger.Info(msg, fields...)
+	appLog().Info(msg, fields...)
 }
 
 func Warn(msg string, fields ...zap.Field) {
-	globalLogger.Warn(msg, fields...)
+	appLog().Warn(msg, fields...)
 }
 
 func Error(msg string, fields ...zap.Field) {
-	globalLogger.Error(msg, fields...)
+	appLog().Error(msg, fields...)
+}
+
+func StdLogger() *log.Logger {
+	return zap.NewStdLog(zap.L())
+}
+
+// appLog skips the wrapper frame so callers report their real source location.
+func appLog() *zap.Logger {
+	return zap.L().WithOptions(zap.AddCallerSkip(1))
 }

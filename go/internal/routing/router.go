@@ -13,7 +13,6 @@ import (
 	"github.com/sharktype/satchel/internal/auth"
 	"github.com/sharktype/satchel/internal/httpx"
 	"github.com/sharktype/satchel/internal/logger"
-	"go.uber.org/zap"
 )
 
 const (
@@ -64,7 +63,7 @@ func NewRouter(corsMiddleware func(http.Handler) http.Handler) *chi.Mux {
 	router.Use(middleware.RequestID)
 	router.Use(clientIP)
 	router.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
-		Logger: zap.NewStdLog(logger.Global()),
+		Logger: logger.StdLogger(),
 	}))
 	router.Use(recoverer)
 	router.Use(middleware.StripSlashes)

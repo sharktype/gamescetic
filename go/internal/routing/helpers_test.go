@@ -12,7 +12,6 @@ import (
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/db/dbtest"
 	"github.com/sharktype/satchel/internal/httpx"
-	appLogger "github.com/sharktype/satchel/internal/logger"
 	"go.uber.org/zap"
 )
 
@@ -63,10 +62,10 @@ func testRouterWithLogger(t *testing.T, logger *zap.Logger) *chi.Mux {
 func useLogger(t *testing.T, logger *zap.Logger) {
 	t.Helper()
 
-	previous := appLogger.Global()
-	appLogger.Set(logger)
+	previous := zap.L()
+	zap.ReplaceGlobals(logger)
 
-	t.Cleanup(func() { appLogger.Set(previous) })
+	t.Cleanup(func() { zap.ReplaceGlobals(previous) })
 }
 
 func newHandledRouter(t *testing.T, database *db.Store) (http.Handler, *authtest.Signer) {

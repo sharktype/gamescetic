@@ -16,7 +16,7 @@ import (
 	"github.com/sharktype/satchel/internal/config"
 	"github.com/sharktype/satchel/internal/db"
 	"github.com/sharktype/satchel/internal/httpx"
-	internalLogger "github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/satchel/internal/logger"
 	"github.com/sharktype/satchel/internal/routing"
 	"go.uber.org/zap"
 )
@@ -43,7 +43,7 @@ func run() (err error) {
 		return fmt.Errorf("error loading config: %w", err)
 	}
 
-	shutdownLogger, err := internalLogger.Init(internalLogger.Config{
+	shutdownLogger, err := logger.Init(logger.Config{
 		Production: cfg.Production,
 		Verbose:    cfg.Verbose,
 	})
@@ -67,9 +67,9 @@ func run() (err error) {
 	}()
 
 	if cfg.Production {
-		internalLogger.Info("app booting in production mode...")
+		logger.Info("app booting in production mode...")
 	} else {
-		internalLogger.Info("app booting in development mode...")
+		logger.Info("app booting in development mode...")
 	}
 
 	appClients, err := clients.New(
@@ -130,7 +130,7 @@ func run() (err error) {
 	serveErr := make(chan error, 1)
 
 	go func() {
-		internalLogger.Info("starting server", zap.Int("port", cfg.Port))
+		logger.Info("starting server", zap.Int("port", cfg.Port))
 		serveErr <- server.ListenAndServe()
 	}()
 
@@ -146,7 +146,7 @@ func run() (err error) {
 
 	// Graceful shutdown:
 
-	internalLogger.Info("shutting down server...")
+	logger.Info("shutting down server...")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
