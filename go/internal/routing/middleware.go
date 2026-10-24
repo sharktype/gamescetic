@@ -47,7 +47,7 @@ func recoverer(next http.Handler) http.Handler {
 //
 // This is the volumetric backstop and must be less restictive than the operation-level limits.
 func rateLimitGlobally(next http.Handler) http.Handler {
-	return httprate.LimitByIP(globalRateLimit, rateLimitWindow)(next)
+	return httprate.LimitBy(globalRateLimit, rateLimitWindow, clientIPKey)(next)
 }
 
 // rateLimit throttles each operation per client IP.
@@ -56,7 +56,7 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 	return func(ctx huma.Context, next func(huma.Context)) {
 		request, writer := humachi.Unwrap(ctx)
 
-		ip, _ := httprate.KeyByIP(request)
+		ip, _ := clientIPKey(request)
 
 		key := ip + " " + ctx.Operation().OperationID
 		if limiter.RespondOnLimit(writer, request, key) {
@@ -79,9 +79,8 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 // therefore be trusted or rate limits can be bypassed by a slightly crafty attacker. Requests
 // without X-Forwarded-For keep their peer address.
 //
-// The rate limiters key on RemoteAddr through httprate.KeyByIP rather than on GetClientIP as
-// KeyByIP collapses IPv6 to its /64; keying on the raw address would hand one IPv6 client 2^64
-// buckets.
+// The rate limiters key on the resolved client IP through CanonicalizeIP, which collapses IPv6
+// to its /64. If you were to key on the raw address, one IPv6 client would get 2^64 buckets.
 //
 // As always, a reminder: production deployments should put a "real" rate limiter at the edge layer
 // and not rely on this basic middleware implementation, especially when there are multiple
@@ -96,4 +95,8 @@ func clientIP(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		},
 	))
+}
+
+func clientIPKey(request *http.Request) (string, error) {
+	return httprate.CanonicalizeIP(middleware.GetClientIP(request.Context())), nil
 }

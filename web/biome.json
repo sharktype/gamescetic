@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",
@@ -7,7 +7,12 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!**/*.{gen,generated}.{ts,tsx}"]
+		"includes": [
+			"**",
+			"!**/*.{gen,generated}.{ts,tsx}",
+			"!pnpm-lock.yaml",
+			"!pnpm-workspace.yaml"
+		]
 	},
 	"formatter": {
 		"enabled": true,
