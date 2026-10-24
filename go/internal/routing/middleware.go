@@ -59,7 +59,7 @@ func rateLimit(limit int) func(huma.Context, func(huma.Context)) {
 // and not rely on this basic middleware implementation, especially when there are multiple
 // replicas behind a load balancer.
 func clientIP(next http.Handler) http.Handler {
-	return middleware.ClientIPFromXFF()(http.HandlerFunc(
+	return middleware.ClientIPFromXFFTrustedProxies(1)(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			if ip := middleware.GetClientIP(r.Context()); ip != "" {
 				r.RemoteAddr = ip
