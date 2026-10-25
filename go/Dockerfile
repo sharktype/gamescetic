@@ -19,9 +19,8 @@ FROM alpine:3 AS runner
 WORKDIR /app
 
 COPY --from=builder /app/main .
-COPY --from=builder /app/internal ./internal
-COPY --from=builder /app/generated ./generated
 
+COPY --from=builder /go/bin/goose /usr/local/bin/goose
 #
 # Add to your post-deploy:
 #
