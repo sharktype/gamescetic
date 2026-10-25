@@ -21,6 +21,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 COPY --from=builder /go/bin/goose /usr/local/bin/goose
+
 #
 # Add to your post-deploy:
 #
