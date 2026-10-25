@@ -11,7 +11,7 @@ import (
 )
 
 func ReportError(ctx context.Context, msg string, err error, fields ...zap.Field) {
-	logger.Error(msg, append([]zap.Field{zap.Error(err)}, fields...)...)
+	logger.WithContext(ctx).Error(msg, append([]zap.Field{zap.Error(err)}, fields...)...)
 
 	hub := sentry.CurrentHub()
 	hub.Client().CaptureException(
@@ -22,7 +22,7 @@ func ReportError(ctx context.Context, msg string, err error, fields ...zap.Field
 }
 
 func PanicRequest(request *http.Request, requestID string, recovered any) {
-	logger.Error(fmt.Sprintf(
+	logger.WithContext(request.Context()).Error(fmt.Sprintf(
 		"panic serving %s %s: %v", request.Method, request.URL.Path, recovered,
 	))
 

@@ -58,6 +58,8 @@ func run() (err error) {
 	}
 	defer shutdownBugtracker()
 
+	logger.EnableSentry(context.Background())
+
 	// We actually do want to capture startup errors in telemetry.
 
 	defer func() {

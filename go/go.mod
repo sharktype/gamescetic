@@ -9,6 +9,7 @@ require (
 	github.com/getsentry/sentry-go v0.50.0
 	github.com/getsentry/sentry-go/otel v0.50.0
 	github.com/getsentry/sentry-go/otel/otlp v0.50.0
+	github.com/getsentry/sentry-go/zap v0.50.0
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/httprate v0.16.1

@@ -31,7 +31,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		raw, err := bearerToken(ctx.Header("Authorization"))
 		if err != nil {
-			logger.Debug("rejected token", zap.Error(err))
+			logger.WithContext(ctx.Context()).Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
@@ -47,14 +47,14 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		identity, err := verifiedToken(raw, keySet, c.cfg)
 		if err != nil {
-			logger.Debug("rejected token", zap.Error(err))
+			logger.WithContext(ctx.Context()).Debug("rejected token", zap.Error(err))
 			_ = huma.WriteErr(api, ctx, http.StatusUnauthorized, "Unauthorized")
 
 			return
 		}
 
 		if !hasAllScopes(identity.token, neededScopes) {
-			logger.Debug("token lacks required scopes", zap.String("sub", identity.sub))
+			logger.WithContext(ctx.Context()).Debug("token lacks required scopes", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return
@@ -62,7 +62,7 @@ func (c *Client) Middleware(api huma.API) func(ctx huma.Context, next func(huma.
 
 		user, err := c.db.GetUserBySub(ctx.Context(), identity.sub)
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.Warn("verified subject is not provisioned", zap.String("sub", identity.sub))
+			logger.WithContext(ctx.Context()).Warn("verified subject is not provisioned", zap.String("sub", identity.sub))
 			_ = huma.WriteErr(api, ctx, http.StatusForbidden, "Forbidden")
 
 			return

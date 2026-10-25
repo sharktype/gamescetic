@@ -1,9 +1,13 @@
 package logger
 
 import (
+	"context"
 	"log"
 
+	"github.com/getsentry/sentry-go"
+	sentryzap "github.com/getsentry/sentry-go/zap"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 // Init installs the application logger globally and returns a disposal function.
@@ -27,7 +31,34 @@ func Init(cfg Config) (shutdown func(), err error) {
 
 	zap.ReplaceGlobals(built)
 
-	return func() { _ = built.Sync() }, nil
+	return func() { _ = zap.L().Sync() }, nil
+}
+
+// EnableSentry tees a Sentry log core into the global logger.
+//
+// It must run after Sentry has been initialised.
+func EnableSentry(ctx context.Context) {
+	if !sentry.CurrentHub().Client().IsEnabled() {
+		return
+	}
+
+	core := sentryzap.NewSentryCore(ctx, sentryzap.Option{
+		Level: []zapcore.Level{
+			zapcore.InfoLevel,
+			zapcore.WarnLevel,
+			zapcore.ErrorLevel,
+		},
+		AddCaller: true,
+	})
+
+	zap.ReplaceGlobals(zap.L().WithOptions(zap.WrapCore(func(existing zapcore.Core) zapcore.Core {
+		return zapcore.NewTee(existing, core)
+	})))
+}
+
+// WithContext returns a logger whose entries are correlated with the active span in ctx.
+func WithContext(ctx context.Context) *zap.Logger {
+	return appLog().With(sentryzap.Context(ctx))
 }
 
 func Debug(msg string, fields ...zap.Field) {
