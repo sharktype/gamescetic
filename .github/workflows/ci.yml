@@ -1,4 +1,4 @@
-name: Satchel CI/CD
+name: Gamescetic CI/CD
 
 on:
     workflow_dispatch:
@@ -23,7 +23,7 @@ permissions:
 #
 
 env:
-    RAILWAY_SERVICE: satchel-go
+    RAILWAY_SERVICE: gamescetic-go
 
 jobs:
     test-go:
@@ -43,7 +43,7 @@ jobs:
                     --health-timeout 5s
                     --health-retries 5
         env:
-            CLIENTS_DB_TEST_DSN: postgres://satchel:satchel@localhost:5432/satchel?sslmode=disable
+            CLIENTS_DB_TEST_DSN: postgres://gamescetic:gamescetic@localhost:5432/gamescetic?sslmode=disable
         steps:
             - uses: actions/checkout@v7
               with:
