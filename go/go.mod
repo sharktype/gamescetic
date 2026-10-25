@@ -5,6 +5,7 @@ go 1.27
 require (
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/danielgtaylor/huma/v2 v2.39.1
+	github.com/exaring/otelpgx v0.13.0
 	github.com/getsentry/sentry-go v0.50.0
 	github.com/getsentry/sentry-go/otel v0.50.0
 	github.com/getsentry/sentry-go/otel/otlp v0.50.0
