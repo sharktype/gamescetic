@@ -10,9 +10,9 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/httpx"
-	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/httpx"
+	"github.com/sharktype/gamescetic/internal/logger"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 

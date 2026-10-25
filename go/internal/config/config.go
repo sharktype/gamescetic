@@ -38,7 +38,7 @@ type CORS struct {
 }
 
 type API struct {
-	Title   string `env:"TITLE" envDefault:"satchel-api"`
+	Title   string `env:"TITLE" envDefault:"gamescetic-api"`
 	Version string `env:"VERSION" envDefault:"0.1.0"`
 }
 

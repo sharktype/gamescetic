@@ -14,10 +14,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/goosemigrator"
-	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/config"
-	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/sql"
+	"github.com/sharktype/gamescetic/generated"
+	"github.com/sharktype/gamescetic/internal/config"
+	"github.com/sharktype/gamescetic/internal/db"
+	"github.com/sharktype/gamescetic/sql"
 )
 
 var migrator = goosemigrator.New("migrations", goosemigrator.WithFS(sql.Migrations))

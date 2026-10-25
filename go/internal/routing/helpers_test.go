@@ -7,11 +7,11 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/internal/auth/authtest"
-	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/internal/db/dbtest"
-	"github.com/sharktype/satchel/internal/httpx"
+	"github.com/sharktype/gamescetic/internal/auth/authtest"
+	"github.com/sharktype/gamescetic/internal/clients"
+	"github.com/sharktype/gamescetic/internal/db"
+	"github.com/sharktype/gamescetic/internal/db/dbtest"
+	"github.com/sharktype/gamescetic/internal/httpx"
 	"go.uber.org/zap"
 )
 

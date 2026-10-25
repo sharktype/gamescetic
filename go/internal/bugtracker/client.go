@@ -8,7 +8,7 @@ import (
 	"github.com/getsentry/sentry-go"
 	sentryotel "github.com/getsentry/sentry-go/otel"
 	sentryotlp "github.com/getsentry/sentry-go/otel/otlp"
-	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/gamescetic/internal/logger"
 	"go.opentelemetry.io/otel"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.uber.org/zap"

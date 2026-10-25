@@ -75,7 +75,7 @@ of three signals to put into the Done column.
 Reviews cannot be made for a game until it is added to Done for the first time. This is a
 philosophical decision; you can review a game you haven't finished if you _drop_ the game, but
 otherwise how can a player know how they feel about a game without giving it a fair shake? Reviews
-are conceptually tied, in Satchel, to the act of no longer playing a game _or_ knowing the game
+are conceptually tied, in Gamescetic, to the act of no longer playing a game _or_ knowing the game
 will be replayed.
 
 Workaround is to move to Done then back to the category, but this will not get first-class support.

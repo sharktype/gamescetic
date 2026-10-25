@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth/authtest"
+	"github.com/sharktype/gamescetic/internal/auth/authtest"
 )
 
 type thingInput struct {

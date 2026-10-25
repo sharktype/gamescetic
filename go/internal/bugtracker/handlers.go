@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/gamescetic/internal/logger"
 	"go.uber.org/zap"
 )
 

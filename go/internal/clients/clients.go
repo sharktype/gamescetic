@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/db"
 )
 
 type Clients struct {

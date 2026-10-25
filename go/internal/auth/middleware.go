@@ -12,8 +12,8 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jws"
 	"github.com/lestrrat-go/jwx/v4/jwt"
-	"github.com/sharktype/satchel/internal/bugtracker"
-	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/gamescetic/internal/bugtracker"
+	"github.com/sharktype/gamescetic/internal/logger"
 	"go.uber.org/zap"
 )
 

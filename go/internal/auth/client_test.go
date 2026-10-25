@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/db/dbtest"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/db/dbtest"
 )
 
 func TestNewFailsWhenTheJWKSFetchFails(t *testing.T) {

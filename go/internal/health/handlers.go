@@ -7,9 +7,9 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/internal/httpx"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/db"
+	"github.com/sharktype/gamescetic/internal/httpx"
 )
 
 type GetHealthInput struct{}

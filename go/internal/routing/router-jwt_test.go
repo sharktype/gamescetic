@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/auth/authtest"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/auth/authtest"
 )
 
 func TestDeclareJWT(t *testing.T) {

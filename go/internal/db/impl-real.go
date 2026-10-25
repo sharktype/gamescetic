@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sharktype/satchel/generated"
+	"github.com/sharktype/gamescetic/generated"
 )
 
 type Store struct {

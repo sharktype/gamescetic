@@ -14,8 +14,8 @@ import (
 	"github.com/lestrrat-go/jwx/v4/jwa"
 	"github.com/lestrrat-go/jwx/v4/jwk"
 	"github.com/lestrrat-go/jwx/v4/jwt"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/db"
 )
 
 // Client verifies tokens from a throwaway IDP.

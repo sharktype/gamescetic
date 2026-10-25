@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/sharktype/satchel/generated"
-	"github.com/sharktype/satchel/internal/db/dbtest"
+	"github.com/sharktype/gamescetic/generated"
+	"github.com/sharktype/gamescetic/internal/db/dbtest"
 )
 
 func TestExecTx(t *testing.T) {

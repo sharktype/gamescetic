@@ -1,4 +1,4 @@
-module github.com/sharktype/satchel
+module github.com/sharktype/gamescetic
 
 go 1.27
 

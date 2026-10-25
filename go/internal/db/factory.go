@@ -7,7 +7,7 @@ import (
 
 	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/sharktype/satchel/internal/logger"
+	"github.com/sharktype/gamescetic/internal/logger"
 	"go.uber.org/zap"
 )
 

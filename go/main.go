@@ -10,14 +10,14 @@ import (
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/bugtracker"
-	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/config"
-	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/internal/httpx"
-	"github.com/sharktype/satchel/internal/logger"
-	"github.com/sharktype/satchel/internal/routing"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/bugtracker"
+	"github.com/sharktype/gamescetic/internal/clients"
+	"github.com/sharktype/gamescetic/internal/config"
+	"github.com/sharktype/gamescetic/internal/db"
+	"github.com/sharktype/gamescetic/internal/httpx"
+	"github.com/sharktype/gamescetic/internal/logger"
+	"github.com/sharktype/gamescetic/internal/routing"
 	"go.uber.org/zap"
 )
 

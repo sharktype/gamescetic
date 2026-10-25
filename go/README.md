@@ -1,1 +1,1 @@
-# Satchel API
+# Gamescetic API

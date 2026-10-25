@@ -7,9 +7,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/internal/bugtracker"
-	"github.com/sharktype/satchel/internal/clients"
-	"github.com/sharktype/satchel/internal/health"
+	"github.com/sharktype/gamescetic/internal/bugtracker"
+	"github.com/sharktype/gamescetic/internal/clients"
+	"github.com/sharktype/gamescetic/internal/health"
 	"go.uber.org/zap"
 )
 

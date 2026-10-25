@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
-	"github.com/sharktype/satchel/internal/auth"
+	"github.com/sharktype/gamescetic/internal/auth"
 )
 
 const ProbePath = "/probe"

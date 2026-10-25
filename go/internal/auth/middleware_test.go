@@ -7,10 +7,10 @@ import (
 
 	"github.com/danielgtaylor/huma/v2/humatest"
 	"github.com/lestrrat-go/jwx/v4/jwt"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/auth/authtest"
-	"github.com/sharktype/satchel/internal/db"
-	"github.com/sharktype/satchel/internal/db/dbtest"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/auth/authtest"
+	"github.com/sharktype/gamescetic/internal/db"
+	"github.com/sharktype/gamescetic/internal/db/dbtest"
 )
 
 func TestNewJWTAuthMiddleware(t *testing.T) {

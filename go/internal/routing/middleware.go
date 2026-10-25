@@ -8,7 +8,7 @@ import (
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httprate"
-	"github.com/sharktype/satchel/internal/bugtracker"
+	"github.com/sharktype/gamescetic/internal/bugtracker"
 )
 
 const (

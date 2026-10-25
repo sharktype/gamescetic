@@ -1,6 +1,6 @@
 package auth
 
-import "github.com/sharktype/satchel/generated"
+import "github.com/sharktype/gamescetic/generated"
 
 func rowToUser(row generated.User) User {
 	return User{

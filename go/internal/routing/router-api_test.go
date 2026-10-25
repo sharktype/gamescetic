@@ -7,9 +7,9 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/go-chi/chi/v5"
-	"github.com/sharktype/satchel/internal/auth"
-	"github.com/sharktype/satchel/internal/auth/authtest"
-	"github.com/sharktype/satchel/internal/db/dbtest"
+	"github.com/sharktype/gamescetic/internal/auth"
+	"github.com/sharktype/gamescetic/internal/auth/authtest"
+	"github.com/sharktype/gamescetic/internal/db/dbtest"
 )
 
 func TestNewAPI(t *testing.T) {

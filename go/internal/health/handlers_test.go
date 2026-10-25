@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/danielgtaylor/huma/v2"
-	dbtest "github.com/sharktype/satchel/internal/db/dbtest"
+	dbtest "github.com/sharktype/gamescetic/internal/db/dbtest"
 )
 
 func TestGetDatabaseHealth(t *testing.T) {

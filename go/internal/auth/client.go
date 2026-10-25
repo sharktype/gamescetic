@@ -7,7 +7,7 @@ import (
 
 	"github.com/jwx-go/jwkfetch/v4"
 	"github.com/lestrrat-go/httprc/v3"
-	"github.com/sharktype/satchel/internal/db"
+	"github.com/sharktype/gamescetic/internal/db"
 )
 
 const jwksMinInterval = 10 * time.Minute
