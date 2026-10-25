@@ -32,9 +32,9 @@ jobs:
             postgres:
                 image: postgres:18
                 env:
-                    POSTGRES_USER: satchel
-                    POSTGRES_PASSWORD: satchel
-                    POSTGRES_DB: satchel
+                    POSTGRES_USER: gamescetic
+                    POSTGRES_PASSWORD: gamescetic
+                    POSTGRES_DB: gamescetic
                 ports:
                     - 5432:5432
                 options: >-
