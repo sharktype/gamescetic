@@ -1,3 +1,3 @@
 # <project>
 
-> **Warning**: This repository is not ready for use and should be ignored for now.
+> **Warning**: This project's relevance has been supplanted by other similar tools.
