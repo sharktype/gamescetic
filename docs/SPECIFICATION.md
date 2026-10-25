@@ -23,7 +23,7 @@ the list.
 - Game store page in an iframe when inspecting game details.
 - Any SDK that must be created to work with required third parties.
 - Bulk editing of games via "select" + action _and_ mass actions like "mark all backlog games with
-  > 1h as in progress."
+  \> 1h as in progress."
 - Dark/light/system mode.
 
 ### Stretch Goals
